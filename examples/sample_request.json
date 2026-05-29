@@ -1,0 +1,62 @@
+{
+  "company": { "id": "company_001", "name": "ABC Restaurant" },
+  "requested_product": {
+    "id": "product_001",
+    "name": "Chicken Breast 2kg",
+    "category_id": "cat_chicken",
+    "brand": "Brand A",
+    "unit": "kg",
+    "pack_size": 2,
+    "base_price": 10.0
+  },
+  "requested_quantity": 20,
+  "contract_items": [
+    { "product_id": "product_001", "contract_price": 9.2, "is_preferred": true },
+    { "product_id": "product_2033", "contract_price": 9.5, "is_preferred": false }
+  ],
+  "candidate_products": [
+    {
+      "id": "product_2033",
+      "name": "Chicken Breast Premium 2kg",
+      "category_id": "cat_chicken",
+      "brand": "Brand B",
+      "unit": "kg",
+      "pack_size": 2,
+      "base_price": 10.5,
+      "stock_quantity": 150,
+      "contract_price": 9.5
+    },
+    {
+      "id": "product_2099",
+      "name": "Organic Chicken Breast 2kg",
+      "category_id": "cat_chicken",
+      "brand": "Brand C",
+      "unit": "kg",
+      "pack_size": 2,
+      "base_price": 11.0,
+      "stock_quantity": 40
+    },
+    {
+      "id": "product_3001",
+      "name": "Chicken Thigh Fillet 2kg",
+      "category_id": "cat_poultry",
+      "brand": "Brand D",
+      "unit": "kg",
+      "pack_size": 2,
+      "base_price": 9.8,
+      "stock_quantity": 80
+    },
+    {
+      "id": "product_4500",
+      "name": "Frozen Carrots 5kg",
+      "category_id": "cat_vegetables",
+      "brand": "Brand E",
+      "unit": "kg",
+      "pack_size": 5,
+      "base_price": 6.0,
+      "stock_quantity": 500
+    }
+  ],
+  "max_results": 3,
+  "use_ai_explanation": true
+}
