@@ -38,7 +38,7 @@ Python AI Recommendation Service
 {
   "company": {
     "id": "company_001",
-    "name": "ABC Restaurant"
+    "name": "Marco's Italian Kitchen"
   },
   "requested_product": {
     "id": "product_001",
@@ -67,7 +67,8 @@ Python AI Recommendation Service
       "pack_size": 2,
       "base_price": 10.5,
       "stock_quantity": 150,
-      "contract_price": 9.5
+      "contract_price": 9.5,
+      "is_active": true
     }
   ],
   "max_results": 3,
@@ -139,7 +140,7 @@ return_result
 |---|---|
 | Active products only | `is_active == true` |
 | Sufficient stock | `stock_quantity >= requested_quantity` |
-| Compatible category | `category_id` matches or is compatible |
+| Exact category | `category_id == requested_product.category_id` (exact match only; parent-category matching is out of scope for MVP) |
 | Not same product | `id != requested_product.id` |
 | Acceptable price | price increase within threshold |
 
@@ -152,7 +153,7 @@ return_result
 | Price similarity | 20 |
 | Stock availability | 10 |
 | Unit / pack similarity | 8 |
-| **Total** | **93+** |
+| **Total** | **93** |
 
 ### MVP Rule
 
@@ -166,24 +167,27 @@ return_result
 ### Day 1
 
 - [ ] Create Python FastAPI project structure
-- [ ] Define Pydantic schemas for input/output
+- [ ] Define Pydantic schemas for input/output (snake_case field names throughout)
 - [ ] Build recommendation logic with mock JSON input
-- [ ] Implement all hard filters
-- [ ] Implement deterministic scoring
+- [ ] Implement all hard filters (use exact `category_id` match; 20% price threshold)
+- [ ] Implement deterministic scoring (see design doc for formula table)
+- [ ] **ADD: Stub `POST /recommendations/replacements` live by end of day** (~30 min)
 
 ### Day 2
 
-- [ ] Add LangGraph workflow (wire all nodes)
-- [ ] Add LangChain + Ollama explanation node
+- [ ] Add LangGraph workflow (wire all 6 nodes: validate_input → apply_hard_filters → score_candidates → rank_replacements → generate_ollama_explanations → return_result)
+- [ ] Day 2 goal: pipeline works with **template explanation** (Ollama node is optional stretch)
+- [ ] Add LangChain + Ollama explanation node (replace template if time allows)
 - [ ] Add fallback template explanation if Ollama is unavailable
+- [ ] Replace stub with real LangGraph pipeline
 - [ ] Test end-to-end with a real JSON payload from .NET
 
 ### Day 3
 
-- [ ] Tune scoring weights
-- [ ] Write unit tests for key recommendation cases
+- [ ] Swap template explanation for real Ollama explanation (if not done Day 2)
+- [ ] Tune scoring weights with real seed data
+- [ ] Write unit tests for key recommendation cases (exact match, price boundary, out-of-stock)
 - [ ] Finalize Swagger/OpenAPI docs
-- [ ] Help .NET engineer wire up the integration
 
 ---
 
@@ -351,19 +355,22 @@ When client calls `POST /recommendations/replacements`:
 
 ### Day 2
 
-- [ ] Build all CRUD endpoints
-- [ ] Write and run seed data script
+- [ ] **ADD: Smoke test — call Python stub with real payload, confirm response deserializes** (morning, ~20 min)
+- [ ] **MANDATORY:** Write and run seed data script (companies, products, contracts, inventory)
+- [ ] **MANDATORY:** Build `CandidateProductService` — queries Atlas for same-category, active, in-stock products
+- [ ] **MANDATORY:** Wire Python service HttpClient wrapper + full recommendation flow
 - [ ] Add MongoDB indexes
-- [ ] Build `CandidateProductService` — queries Atlas for eligible replacements
-- [ ] Stub out Python service client (HttpClient wrapper)
+- [ ] Build CRUD read endpoints (GET) — stretch goal
+- [ ] Build CRUD write endpoints (POST/PATCH) — stretch goal
+- [ ] Note: JSON deserialization of Python responses must use `JsonNamingPolicy.SnakeCaseLower`
 
 ### Day 3
 
-- [ ] Wire up full recommendation flow end-to-end
+- [ ] Full end-to-end integration test (seed data → .NET → Python → Ollama → response)
 - [ ] Implement `recommendation_logs` collection write
-- [ ] Add error handling for Python service unavailability (timeout, circuit-breaker)
+- [ ] Add timeout handling (5s timeout, 503 response on failure — no circuit-breaker needed)
 - [ ] Final Swagger cleanup and endpoint descriptions
-- [ ] Prepare demo scenario with seed data
+- [ ] Script and practice the demo scenario
 
 ---
 
