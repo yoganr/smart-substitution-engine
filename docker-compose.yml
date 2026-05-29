@@ -1,0 +1,92 @@
+# =============================================================================
+# Self-contained stack for the Smart Substitution Engine AI service.
+#
+#   docker compose up --build
+#
+# Services:
+#   ollama       - local LLM server (text generation)
+#   ollama-init  - one-shot: pulls the qwen3.5:0.8b chat model, then exits
+#   ai-service   - FastAPI + LangGraph + sentence-transformers (bge-m3, CPU)
+#
+# The .NET backend (owned by the other engineer) is NOT included here — it calls
+# this service at http://localhost:8000 (see INTEGRATION.md).
+# =============================================================================
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sse-ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    # Not published to the host by default, to avoid clashing with a host Ollama
+    # already on :11434. Uncomment to expose it:
+    # ports:
+    #   - "11435:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # Pulls the chat model into the ollama volume once, then exits (code 0).
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: sse-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3.5:0.8b"]
+    restart: "no"
+
+  ai-service:
+    build:
+      context: .
+      args:
+        # Set to "true" to bake bge-m3 into the image (offline-capable, larger).
+        PRELOAD_EMBEDDING_MODEL: "false"
+    image: sse-ai:latest
+    container_name: sse-ai
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - SSE_OLLAMA_BASE_URL=http://ollama:11434
+      - SSE_CHAT_MODEL=qwen3.5:0.8b
+      - SSE_EMBEDDING_BACKEND=sentence_transformers
+      - SSE_EMBEDDING_MODEL=BAAI/bge-m3
+      - SSE_EMBEDDING_DEVICE=cpu
+      - HF_HOME=/cache/huggingface
+    volumes:
+      # Persists the downloaded bge-m3 weights across restarts (first run ~2.3GB).
+      - hf-cache:/cache/huggingface
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s   # first start downloads + loads the embedding model
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
+  hf-cache:
+
+# -----------------------------------------------------------------------------
+# GPU note: this stack uses CPU PyTorch for portability. For GPU embeddings,
+# build the image against a CUDA torch wheel and add to ai-service:
+#   deploy:
+#     resources:
+#       reservations:
+#         devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+# plus set SSE_EMBEDDING_DEVICE=cuda. Requires the NVIDIA Container Toolkit.
+# -----------------------------------------------------------------------------

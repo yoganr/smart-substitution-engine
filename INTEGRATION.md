@@ -11,10 +11,16 @@ Recommendation Service. The Python side is done, tested, and live-verified.
 
 ## 1. Run the Python service (one command)
 
-From the repo root, on the AI engineer's machine (or yours):
+**Easiest — Docker (brings up the AI service + Ollama together):**
+
+```bash
+docker compose up --build      # serves on http://localhost:8000
+```
+
+**Or local Python** (on the AI engineer's machine or yours):
 
 ```powershell
-# Ollama must be running (it powers explanations + semantic similarity)
+# Ollama must be running (it powers the text explanations)
 ollama serve            # if not already running
 
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000

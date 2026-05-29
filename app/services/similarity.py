@@ -1,9 +1,10 @@
 """Semantic + lexical similarity for category/product compatibility.
 
-The engine prefers true semantic similarity using an Ollama embedding model
-(``qwen3-embedding:0.6b``) and gracefully falls back to a deterministic lexical
-measure when embeddings are disabled or Ollama is unavailable. This keeps unit
-tests fast and offline while letting the live service be genuinely "smart".
+The engine prefers true semantic similarity using a BAAI BGE embedding model
+(``BAAI/bge-m3`` via ``sentence-transformers``, GPU when available) and
+gracefully falls back to a deterministic lexical measure when embeddings are
+disabled or the model fails to load. This keeps unit tests fast and offline
+while letting the live service be genuinely "smart".
 """
 
 from __future__ import annotations
@@ -68,6 +69,11 @@ class SimilarityService:
     @property
     def uses_embeddings(self) -> bool:
         return self._embeddings is not None
+
+    @property
+    def embedding_device(self) -> Optional[str]:
+        """Device the embedding model runs on (e.g. 'cuda:0'), if available."""
+        return getattr(self._embeddings, "device", None)
 
     async def category_similarities(
         self, requested: RequestedProduct, candidates: Sequence[CandidateProduct]

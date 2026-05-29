@@ -1,0 +1,27 @@
+# Keep the build context small and avoid leaking local state into the image.
+.git
+.gitignore
+.idea
+.vscode
+
+# Python caches / local envs
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local secrets / config (compose injects env instead)
+.env
+.env.*
+!.env.example
+
+# Docs & dev-only files not needed at runtime
+*.md
+!README.md
+requirements-dev.txt
+tests/

@@ -52,12 +52,13 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.engine = build_engine(settings)
     logger.info(
-        "%s v%s ready (chat_model=%s, embedding_model=%s, embeddings=%s, llm=%s)",
+        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s)",
         settings.service_name,
         __version__,
         settings.chat_model,
+        settings.embedding_backend,
         settings.embedding_model,
-        settings.enable_embeddings,
+        app.state.engine.similarity.embedding_device or "n/a",
         settings.enable_llm_explanations,
     )
     yield
@@ -88,10 +89,23 @@ async def root() -> RedirectResponse:
     tags=["system"],
     summary="Service + Ollama health check",
 )
-async def health() -> HealthResponse:
+async def health(http_request: Request) -> HealthResponse:
     settings = get_settings()
     ollama = await probe_ollama(settings)
-    return HealthResponse(service=settings.service_name, version=__version__, ollama=ollama)
+    engine = getattr(http_request.app.state, "engine", None)
+    embeddings = {
+        "backend": settings.embedding_backend,
+        "model": settings.embedding_model,
+        "enabled": settings.enable_embeddings,
+        "available": bool(engine and engine.similarity.uses_embeddings),
+        "device": engine.similarity.embedding_device if engine else None,
+    }
+    return HealthResponse(
+        service=settings.service_name,
+        version=__version__,
+        ollama=ollama,
+        embeddings=embeddings,
+    )
 
 
 @app.post(

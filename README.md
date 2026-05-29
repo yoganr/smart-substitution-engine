@@ -37,10 +37,11 @@ validate_input → apply_hard_filters → score_candidates → rank_replacements
    is unavailable, a deterministic template explanation is used instead.
 
 ### What makes it *smart*
-- **Semantic similarity** via the `qwen3-embedding:0.6b` model lets the engine
-  recognise that "Chicken Thigh Fillet" is a closer substitute for "Chicken
-  Breast" than "Frozen Carrots" — even across category boundaries — with a
-  deterministic lexical fallback when embeddings are off.
+- **Semantic similarity** via the BAAI `bge-m3` embedding model (run locally with
+  `sentence-transformers`, GPU-accelerated) lets the engine recognise that
+  "Chicken Thigh Fillet" is a closer substitute for "Chicken Breast" than "Frozen
+  Carrots" — even across category boundaries — with a deterministic lexical
+  fallback when embeddings are off.
 - **Grounded explanations**: the LLM is fed only verified facts (never asked to
   invent prices/brands), so explanations are trustworthy.
 - **Graceful degradation**: works with Ollama fully on, embeddings only, or
@@ -50,14 +51,27 @@ validate_input → apply_hard_filters → score_candidates → rank_replacements
 
 ## Quickstart
 
+### Option A — Docker (self-contained: AI service + Ollama)
+
+```bash
+docker compose up --build
+```
+
+Brings up the AI service **and** Ollama, auto-pulls `qwen3.5:0.8b`, and serves on
+<http://localhost:8000>. See [`DOCKER.md`](DOCKER.md) for details. First run
+downloads the models (~minutes); after that it's instant.
+
+### Option B — Local Python
+
 ```powershell
 # 1. Install dependencies (into your current Python environment)
 python -m pip install -r requirements.txt
 
-# 2. Make sure Ollama is running with the models pulled
+# 2. Make sure Ollama is running with the chat model pulled
+#    (embeddings run locally via sentence-transformers — BAAI/bge-m3 downloads
+#     automatically from HuggingFace on first use)
 ollama serve
-ollama pull llama3.2
-ollama pull qwen3-embedding:0.6b
+ollama pull qwen3.5:0.8b
 
 # 3. Run the service
 python -m uvicorn app.main:app --reload --port 8000
@@ -83,8 +97,10 @@ Copy [`.env.example`](.env.example) and adjust. Highlights:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SSE_CHAT_MODEL` | `llama3.2` | Ollama model for explanations |
-| `SSE_EMBEDDING_MODEL` | `qwen3-embedding:0.6b` | Ollama model for semantic similarity |
+| `SSE_CHAT_MODEL` | `qwen3.5:0.8b` | Ollama model for explanations |
+| `SSE_EMBEDDING_BACKEND` | `sentence_transformers` | Embedding backend (`sentence_transformers` or `ollama`) |
+| `SSE_EMBEDDING_MODEL` | `BAAI/bge-m3` | BAAI BGE model for semantic similarity |
+| `SSE_EMBEDDING_DEVICE` | _(auto)_ | `cpu` / `cuda`; blank = auto-detect GPU |
 | `SSE_ENABLE_EMBEDDINGS` | `true` | Toggle semantic similarity (off → lexical) |
 | `SSE_ENABLE_LLM_EXPLANATIONS` | `true` | Toggle LLM (off → template explanations) |
 | `SSE_W_CATEGORY` … `SSE_W_UNIT_PACK` | 30/25/20/10/8 | Scoring weights (tune Day 3) |

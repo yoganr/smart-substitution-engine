@@ -43,9 +43,9 @@ async def test_real_ollama_generates_explanation():
 
 async def test_real_embeddings_rank_related_category_higher():
     settings = await _live_settings()
-    if not (await probe_ollama(settings)).get("embedding_model_present"):
-        pytest.skip("Embedding model not pulled.")
     engine = build_engine(settings)
+    if not engine.similarity.uses_embeddings:
+        pytest.skip("Embeddings unavailable (sentence-transformers / model not loaded).")
     related = make_candidate(
         id="related", name="Chicken Thigh 2kg", category_id="cat_poultry", stock_quantity=100
     )

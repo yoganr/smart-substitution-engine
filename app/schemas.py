@@ -159,3 +159,4 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     ollama: dict
+    embeddings: dict
