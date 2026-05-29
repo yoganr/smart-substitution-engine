@@ -221,4 +221,4 @@ __marimo__/
 backend/**/obj/
 backend/**/bin/
 backend/**/*.user
-backend/appsettings.Development.json
+backend/**/appsettings.Development.json
