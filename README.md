@@ -6,10 +6,16 @@ optimal products balancing **price and quality**, ensures **category/allergen
 compatibility**, and prioritizes **suppliers the customer already has contracts
 with**.
 
-This repository contains the **Python AI Recommendation Service** (FastAPI +
-LangGraph + Ollama). The .NET backend + MongoDB Atlas live alongside it — see
-[`INTEGRATION.md`](INTEGRATION.md) for how the two talk to each other, and
-[`HACKATHON.md`](HACKATHON.md) for the full plan.
+This is a monorepo with two services:
+
+| Folder | Owner | Stack |
+|---|---|---|
+| [`ai-service/`](ai-service/) | Python AI Engineer | FastAPI · LangGraph · sentence-transformers · Ollama |
+| [`backend/`](backend/) | .NET Engineer | ASP.NET Core · MongoDB Atlas |
+
+The .NET backend calls the Python AI service at `http://localhost:8000` — see
+[`INTEGRATION.md`](INTEGRATION.md) for the contract and [`HACKATHON.md`](HACKATHON.md)
+for the full plan. This README documents the **Python AI service** (`ai-service/`).
 
 ---
 
@@ -64,6 +70,8 @@ downloads the models (~minutes); after that it's instant.
 ### Option B — Local Python
 
 ```powershell
+cd ai-service
+
 # 1. Install dependencies (into your current Python environment)
 python -m pip install -r requirements.txt
 
@@ -112,7 +120,8 @@ Copy [`.env.example`](.env.example) and adjust. Highlights:
 ## Testing
 
 ```powershell
-python -m pytest                 # offline unit + API tests (no Ollama needed)
+cd ai-service
+python -m pytest                 # offline unit + API + contract tests (no Ollama needed)
 python -m pytest -m integration  # live tests against a running Ollama
 ```
 
@@ -124,21 +133,26 @@ tests auto-skip when Ollama is not reachable.
 ## Project layout
 
 ```
-app/
-  main.py            FastAPI app, lifespan, /health + /recommendations endpoints
-  config.py          Settings (env-driven weights & thresholds)
-  schemas.py         Pydantic request/response models (the .NET contract)
-  engine.py          Wires providers → services → graph
-  providers.py       Ollama chat + embeddings adapters (+ health probe)
-  services/
-    filters.py       Hard filters
-    scoring.py       Deterministic scoring + ranking (pure, no I/O)
-    similarity.py    Semantic (embedding) + lexical similarity
-    explanation.py   Grounded LLM explanations + template fallback
-  graph/
-    state.py         LangGraph shared state
-    nodes.py         Node implementations
-    workflow.py      Graph wiring (the 6 nodes above)
-tests/               Unit, API, and live-integration tests
-examples/            Sample request payload
+ai-service/                 ← this service (run commands from here)
+  app/
+    main.py            FastAPI app, lifespan, /health + /recommendations endpoints
+    config.py          Settings (env-driven weights & thresholds)
+    schemas.py         Pydantic request/response models (the .NET contract)
+    engine.py          Wires providers → services → graph
+    providers.py       Ollama chat + sentence-transformers embeddings (+ health probe)
+    services/
+      filters.py       Hard filters (incl. dietary/allergen safety)
+      scoring.py       Deterministic scoring + ranking + confidence (pure, no I/O)
+      similarity.py    Semantic (embedding) + lexical similarity
+      explanation.py   Grounded LLM explanations + template fallback
+    graph/
+      state.py         LangGraph shared state
+      nodes.py         Node implementations
+      workflow.py      Graph wiring (the 6 nodes above)
+  tests/               Unit, API, contract, and live-integration tests
+  examples/            Sample request + flow tracer
+  Dockerfile          CPU image (build context = ai-service/)
+  requirements.txt
+backend/                    ← .NET service (owned by the .NET engineer)
+docker-compose.yml          ← root: ai-service + Ollama
 ```

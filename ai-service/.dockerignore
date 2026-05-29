@@ -22,6 +22,8 @@ env/
 
 # Docs & dev-only files not needed at runtime
 *.md
-!README.md
 requirements-dev.txt
 tests/
+conftest.py
+pytest.ini
+run.ps1

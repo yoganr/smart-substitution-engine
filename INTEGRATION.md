@@ -20,6 +20,8 @@ docker compose up --build      # serves on http://localhost:8000
 **Or local Python** (on the AI engineer's machine or yours):
 
 ```powershell
+cd ai-service           # the Python service lives here
+
 # Ollama must be running (it powers the text explanations)
 ollama serve            # if not already running
 
@@ -57,7 +59,8 @@ If the AI service runs on another laptop, use that machine's LAN IP, e.g.
     "brand": "Brand A",
     "unit": "kg",
     "pack_size": 2,
-    "base_price": 10.0
+    "base_price": 10.0,
+    "dietary_tags": ["halal"]
   },
   "requested_quantity": 20,
   "contract_items": [
@@ -73,7 +76,9 @@ If the AI service runs on another laptop, use that machine's LAN IP, e.g.
       "pack_size": 2,
       "base_price": 10.5,
       "stock_quantity": 150,
-      "contract_price": 9.5
+      "contract_price": 9.5,
+      "is_active": true,
+      "dietary_tags": ["halal"]
     }
   ],
   "max_results": 3,
@@ -85,6 +90,9 @@ If the AI service runs on another laptop, use that machine's LAN IP, e.g.
 - `contract_items` / `candidate_products` may be empty arrays.
 - `contract_price`, `brand`, `unit`, `pack_size` are optional (nullable).
 - `is_active` on a candidate defaults to `true` if omitted.
+- `dietary_tags` (on requested + candidates) drives **allergen/dietary safety**:
+  a replacement must carry **every** tag the requested product has, else it's
+  rejected. Empty/omitted → no constraint. Matches the .NET `Product.DietaryTags`.
 - `requested_quantity` must be `> 0`, `max_results >= 1` (else HTTP 422).
 - Set `use_ai_explanation: false` to skip the LLM and get instant deterministic
   template explanations (useful for fast demos / when Ollama is off).
@@ -98,6 +106,8 @@ If the AI service runs on another laptop, use that machine's LAN IP, e.g.
       "product_id": "product_2033",
       "name": "Chicken Breast Premium 2kg",
       "final_score": 83,
+      "confidence_pct": 89,
+      "confidence_label": "Excellent",
       "score_breakdown": {
         "category_similarity": 30,
         "contract_match": 18,
@@ -118,24 +128,41 @@ If the AI service runs on another laptop, use that machine's LAN IP, e.g.
       "explanation_source": "ollama"
     }
   ],
+  "rejected_candidates": [
+    { "product_id": "product_9001", "name": "Pork Loin 2kg", "rejection_reason": "incompatible_category(sim=0.39); missing_dietary_tags(halal)" }
+  ],
+  "no_candidates_reason": null,
   "requested_product_id": "product_001",
   "replacement_needed": true,
   "candidates_evaluated": 4,
-  "candidates_rejected": 0,
+  "candidates_rejected": 1,
   "warnings": []
 }
 ```
 
 - `final_score` always equals the sum of `score_breakdown` (0–93).
+- `confidence_pct` = `final_score` as a percentage of 93; `confidence_label` is one
+  of `Excellent / Strong / Good / Fair / Weak`.
+- `rejected_candidates` lists filtered-out items with a single `rejection_reason`
+  string (maps to the .NET `PythonRejectedCandidateDto`).
+- `no_candidates_reason` is `null` when there are replacements, otherwise a short
+  explanation (no candidates supplied / all filtered out).
 - `explanation_source` is `"ollama"` when the LLM wrote it, `"template"` when it
   fell back (Ollama down / disabled). Either way `explanation` is always present.
-- The fields after `explanation` are **additive diagnostics** — handy for logs,
-  safe to ignore. `System.Text.Json` drops unknown fields by default, so your
-  DTO only needs the fields you care about.
+- The remaining fields (`brand`, `effective_price`, `warnings`, …) are **additive
+  diagnostics** — `System.Text.Json` drops unknown fields, so the .NET DTO only
+  needs the fields it cares about.
 
 ---
 
-## 3. Drop-in C# client (.NET 8)
+## 3. C# client (.NET 8)
+
+> ✅ **Already implemented** in `backend/SmartSubstitution.Api`:
+> `Services/PythonAiClient.cs`, `Dtos/PythonAiDtos.cs`,
+> `Settings/SnakeCaseNamingPolicy.cs`, wired in `Program.cs` and called from
+> `Controllers/RecommendationController.cs`. The reference snippet below documents
+> the shape; the real DTOs include `confidence_pct`, `confidence_label`,
+> `rejected_candidates`, `no_candidates_reason`, and `dietary_tags`.
 
 All JSON is `snake_case`. .NET 8 has a built-in policy for that
 (`JsonNamingPolicy.SnakeCaseLower`) so **no `[JsonPropertyName]` attributes are
@@ -355,10 +382,10 @@ app.MapPost("/recommendations/replacements", async (
 # from the repo root
 curl -X POST http://localhost:8000/recommendations/replacements `
   -H "Content-Type: application/json" `
-  -d "@examples/sample_request.json"
+  -d "@ai-service/examples/sample_request.json"
 ```
 
-A ready-made payload lives at [`examples/sample_request.json`](examples/sample_request.json).
+A ready-made payload lives at [`ai-service/examples/sample_request.json`](ai-service/examples/sample_request.json).
 
 ---
 

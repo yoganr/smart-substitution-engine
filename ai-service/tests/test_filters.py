@@ -1,96 +1,120 @@
-import pytest
-from app.nodes import apply_hard_filters
-from app.schemas import CandidateProduct
+"""Unit tests for the hard-filter layer."""
+
+from __future__ import annotations
+
+from app.services.filters import apply_hard_filters
+from tests.factories import make_candidate, make_requested
 
 
-def _run_filters(sample_request, extra_candidates=None):
-    candidates = list(sample_request.candidate_products)
-    if extra_candidates:
-        candidates.extend(extra_candidates)
-    state = {
-        "request": sample_request,
-        "candidates": candidates,
-        "rejected": [],
-        "scored": [],
-        "replacements": [],
-        "no_candidates_reason": None,
-    }
-    return apply_hard_filters(state)
-
-
-def test_inactive_product_rejected(sample_request, base_candidate):
-    inactive = base_candidate.model_copy(update={"id": "p_inactive", "is_active": False})
-    result = _run_filters(sample_request, [inactive])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "p_inactive" in rejected_ids
-    reason = next(r.rejection_reason for r in result["rejected"] if r.product_id == "p_inactive")
-    assert "inactive" in reason
-
-
-def test_insufficient_stock_rejected(sample_request, base_candidate):
-    low_stock = base_candidate.model_copy(update={"id": "p_lowstock", "stock_quantity": 5})
-    result = _run_filters(sample_request, [low_stock])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "p_lowstock" in rejected_ids
-    reason = next(r.rejection_reason for r in result["rejected"] if r.product_id == "p_lowstock")
-    assert "stock" in reason
-
-
-def test_wrong_category_rejected(sample_request, base_candidate):
-    wrong_cat = base_candidate.model_copy(update={"id": "p_wrongcat", "category_id": "cat_beef"})
-    result = _run_filters(sample_request, [wrong_cat])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "p_wrongcat" in rejected_ids
-
-
-def test_same_product_rejected(sample_request, base_candidate):
-    same = base_candidate.model_copy(update={"id": "product_001"})
-    result = _run_filters(sample_request, [same])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "product_001" in rejected_ids
-
-
-def test_price_over_threshold_rejected(sample_request, base_candidate):
-    # 10.0 * 1.20 = 12.0; base_price 13.0 should be rejected
-    expensive = base_candidate.model_copy(update={"id": "p_expensive", "base_price": 13.0})
-    result = _run_filters(sample_request, [expensive])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "p_expensive" in rejected_ids
-    reason = next(r.rejection_reason for r in result["rejected"] if r.product_id == "p_expensive")
-    assert "threshold" in reason
-
-
-def test_allergen_mismatch_rejected(sample_request, base_candidate):
-    # requested has dietary_tags=["halal"], candidate has no halal tag
-    no_halal = base_candidate.model_copy(update={"id": "p_nohalal", "dietary_tags": ["gluten-free"]})
-    result = _run_filters(sample_request, [no_halal])
-    rejected_ids = {r.product_id for r in result["rejected"]}
-    assert "p_nohalal" in rejected_ids
-    reason = next(r.rejection_reason for r in result["rejected"] if r.product_id == "p_nohalal")
-    assert "halal" in reason
-
-
-def test_allergen_superset_passes(sample_request, base_candidate):
-    # candidate has halal + extra tags — should pass
-    superset = base_candidate.model_copy(
-        update={"id": "p_superset", "dietary_tags": ["halal", "gluten-free", "kosher"]}
+def _filter(candidates, settings, sims=None, req_price=10.0, qty=20, requested=None):
+    req = requested or make_requested()
+    return apply_hard_filters(
+        req,
+        candidates,
+        requested_quantity=qty,
+        requested_effective_price=req_price,
+        category_similarities=sims or {c.id: 1.0 for c in candidates},
+        contract_lookup={},
+        settings=settings,
     )
-    result = _run_filters(sample_request, [superset])
-    passing_ids = {c.id for c in result["candidates"]}
-    assert "p_superset" in passing_ids
 
 
-def test_allergen_case_insensitive(sample_request, base_candidate):
-    # "Halal" (uppercase) should match "halal" requirement
-    upper_tag = base_candidate.model_copy(
-        update={"id": "p_upper", "dietary_tags": ["Halal"]}
+def test_inactive_candidate_rejected(settings):
+    cand = make_candidate(is_active=False)
+    accepted, rejected = _filter([cand], settings)
+    assert not accepted
+    assert "inactive" in rejected[0].reasons
+
+
+def test_insufficient_stock_rejected(settings):
+    cand = make_candidate(stock_quantity=5)
+    accepted, rejected = _filter([cand], settings, qty=20)
+    assert not accepted
+    assert "insufficient_stock" in rejected[0].reasons
+
+
+def test_same_product_rejected(settings):
+    cand = make_candidate(id="product_001")  # equals requested.id
+    accepted, rejected = _filter([cand], settings)
+    assert not accepted
+    assert "same_product" in rejected[0].reasons
+
+
+def test_price_too_high_rejected(settings):
+    cand = make_candidate(base_price=100.0, contract_price=None)
+    accepted, rejected = _filter([cand], settings, req_price=10.0)
+    assert not accepted
+    assert "price_too_high" in rejected[0].reasons
+
+
+def test_cross_category_low_similarity_rejected(settings):
+    cand = make_candidate(category_id="cat_beef")
+    accepted, rejected = _filter([cand], settings, sims={cand.id: 0.2})
+    assert not accepted
+    assert any("incompatible_category" in r for r in rejected[0].reasons)
+
+
+def test_cross_category_high_similarity_accepted(settings):
+    cand = make_candidate(category_id="cat_poultry")
+    accepted, rejected = _filter([cand], settings, sims={cand.id: 0.85})
+    assert len(accepted) == 1
+    assert not rejected
+
+
+def test_cross_category_blocked_when_disabled():
+    from app.config import Settings
+
+    strict = Settings(
+        enable_embeddings=False,
+        enable_llm_explanations=False,
+        allow_cross_category=False,
     )
-    result = _run_filters(sample_request, [upper_tag])
-    passing_ids = {c.id for c in result["candidates"]}
-    assert "p_upper" in passing_ids
+    cand = make_candidate(category_id="cat_poultry")
+    accepted, rejected = _filter([cand], strict, sims={cand.id: 0.99})
+    assert not accepted
+    assert "incompatible_category" in rejected[0].reasons
 
 
-def test_good_candidate_passes(sample_request, base_candidate):
-    result = _run_filters(sample_request)
-    passing_ids = {c.id for c in result["candidates"]}
-    assert base_candidate.id in passing_ids
+def test_good_candidate_accepted(settings):
+    cand = make_candidate()
+    accepted, rejected = _filter([cand], settings)
+    assert len(accepted) == 1
+    assert not rejected
+
+
+# --- dietary / allergen safety ---------------------------------------------
+def test_candidate_missing_required_dietary_tag_rejected(settings):
+    req = make_requested(dietary_tags=["gluten_free", "halal"])
+    cand = make_candidate(dietary_tags=["halal"])  # missing gluten_free
+    accepted, rejected = _filter([cand], settings, requested=req)
+    assert not accepted
+    assert any("missing_dietary_tags" in r for r in rejected[0].reasons)
+
+
+def test_candidate_with_superset_of_dietary_tags_accepted(settings):
+    req = make_requested(dietary_tags=["halal"])
+    cand = make_candidate(dietary_tags=["halal", "gluten_free"])  # superset is fine
+    accepted, rejected = _filter([cand], settings, requested=req)
+    assert len(accepted) == 1
+    assert not rejected
+
+
+def test_no_required_dietary_tags_means_no_constraint(settings):
+    req = make_requested(dietary_tags=[])
+    cand = make_candidate(dietary_tags=[])
+    accepted, rejected = _filter([cand], settings, requested=req)
+    assert len(accepted) == 1
+
+
+def test_dietary_enforcement_can_be_disabled():
+    from app.config import Settings
+
+    lenient = Settings(
+        enable_embeddings=False,
+        enable_llm_explanations=False,
+        enforce_dietary_tags=False,
+    )
+    req = make_requested(dietary_tags=["gluten_free"])
+    cand = make_candidate(dietary_tags=[])
+    accepted, _ = _filter([cand], lenient, requested=req)
+    assert len(accepted) == 1

@@ -10,12 +10,17 @@ from __future__ import annotations
 from app.config import Settings
 from app.graph.state import GraphState
 from app.logging_config import get_logger
-from app.schemas import Replacement, ReplacementResponse
+from app.schemas import (
+    RejectedCandidateInfo,
+    Replacement,
+    ReplacementResponse,
+)
 from app.services.explanation import ExplanationService
 from app.services.filters import apply_hard_filters
 from app.services.scoring import (
     ScoredCandidate,
     build_contract_lookup,
+    confidence,
     effective_price,
     rank_candidates,
     score_candidate,
@@ -140,9 +145,21 @@ class RecommendationNodes:
         ranked = state.get("ranked", [])
         rejected = state.get("rejected", [])
 
-        replacements = [self._to_replacement(s, state) for s in ranked]
+        replacements = [self._to_replacement(s) for s in ranked]
+        rejected_info = [
+            RejectedCandidateInfo(
+                product_id=r.id,
+                name=r.name,
+                rejection_reason="; ".join(r.reasons),
+            )
+            for r in rejected
+        ]
+        no_candidates_reason = self._no_candidates_reason(request, replacements, rejected)
+
         response = ReplacementResponse(
             replacements=replacements,
+            rejected_candidates=rejected_info,
+            no_candidates_reason=no_candidates_reason,
             requested_product_id=request.requested_product.id,
             replacement_needed=True,
             candidates_evaluated=len(request.candidate_products),
@@ -151,17 +168,33 @@ class RecommendationNodes:
         )
         return {"response": response}
 
+    @staticmethod
+    def _no_candidates_reason(request, replacements, rejected) -> str | None:
+        if replacements:
+            return None
+        if not request.candidate_products:
+            return "No candidate products were supplied."
+        if rejected:
+            return f"All {len(rejected)} candidate(s) were filtered out as incompatible."
+        return "No suitable replacement was found."
+
     # -- helpers ----------------------------------------------------------
-    def _to_replacement(self, scored: ScoredCandidate, state: GraphState) -> Replacement:
+    def _to_replacement(self, scored: ScoredCandidate) -> Replacement:
         cand = scored.candidate
-        contract_lookup = state["contract_lookup"]
         contract_price = cand.contract_price
-        if contract_price is None and cand.id in contract_lookup:
-            contract_price = contract_lookup[cand.id].contract_price
+        if contract_price is None:
+            contract_price = (
+                scored.facts.candidate_effective_price
+                if scored.facts.is_under_contract
+                else None
+            )
+        pct, label = confidence(scored.final_score, self.settings.max_total_score)
         return Replacement(
             product_id=cand.id,
             name=cand.name,
             final_score=scored.final_score,
+            confidence_pct=pct,
+            confidence_label=label,
             score_breakdown=scored.breakdown,
             explanation=scored.explanation,
             brand=cand.brand,

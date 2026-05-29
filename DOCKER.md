@@ -48,7 +48,7 @@ curl http://localhost:8000/health
 # A real recommendation
 curl -X POST http://localhost:8000/recommendations/replacements \
   -H "Content-Type: application/json" \
-  -d @examples/sample_request.json
+  -d @ai-service/examples/sample_request.json
 ```
 
 Swagger UI: <http://localhost:8000/docs>

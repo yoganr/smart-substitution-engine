@@ -7,6 +7,7 @@ Implements the rules from HACKATHON.md:
     | Compatible category    | category_id matches or is compatible    |
     | Not same product       | id != requested_product.id              |
     | Acceptable price        | price increase within threshold        |
+    | Dietary/allergen safe   | candidate carries all required tags     |
 
 Category compatibility uses the precomputed semantic similarity so a
 closely-related product from a neighbouring category can still qualify.
@@ -73,6 +74,14 @@ def apply_hard_filters(
             cand_price = _candidate_effective_price(cand, contract_lookup)
             if cand_price > price_ceiling:
                 reasons.append("price_too_high")
+
+        # Allergen / dietary safety: candidate must carry every dietary tag the
+        # requested product requires. No constraint when none are required.
+        if settings.enforce_dietary_tags and requested.dietary_tags:
+            cand_tags = set(cand.dietary_tags)
+            missing = [t for t in requested.dietary_tags if t not in cand_tags]
+            if missing:
+                reasons.append(f"missing_dietary_tags({','.join(missing)})")
 
         if reasons:
             rejected.append(RejectedCandidate(id=cand.id, name=cand.name, reasons=reasons))

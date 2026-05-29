@@ -1,148 +1,183 @@
+"""Unit tests for the deterministic scoring layer."""
+
+from __future__ import annotations
+
 import pytest
-from app.scoring import (
-    compute_confidence,
-    compute_total_score,
-    score_category,
-    score_contract,
-    score_price,
-    score_stock,
-    score_unit_pack,
+
+from app.services.scoring import (
+    build_contract_lookup,
+    confidence,
+    price_factor,
+    rank_candidates,
+    score_candidate,
+    stock_factor,
+    unit_pack_factor,
 )
+from app.schemas import ContractItem
+from tests.factories import make_candidate, make_requested
 
 
-# --- score_category ---
-
-def test_category_exact_match(base_candidate, requested_product):
-    assert score_category(base_candidate, requested_product) == 30
-
-
-def test_category_no_match(base_candidate, requested_product):
-    different = base_candidate.model_copy(update={"category_id": "cat_beef"})
-    assert score_category(different, requested_product) == 0
-
-
-# --- score_contract ---
-
-def test_contract_in_items(base_candidate, contract_items):
-    # base_candidate.id == "product_2033" which is in contract_items
-    assert score_contract(base_candidate, contract_items) == 25
+# --- confidence -------------------------------------------------------------
+def test_confidence_pct_and_labels():
+    assert confidence(93, 93) == (100, "Excellent")
+    assert confidence(83, 93)[0] == 89  # 83/93 -> 89%
+    assert confidence(83, 93)[1] == "Excellent"
+    assert confidence(65, 93)[1] == "Strong"   # 70%
+    assert confidence(52, 93)[1] == "Good"     # 56%
+    assert confidence(0, 93) == (0, "Weak")
 
 
-def test_contract_not_in_items(base_candidate, contract_items):
-    unknown = base_candidate.model_copy(update={"id": "product_unknown"})
-    assert score_contract(unknown, contract_items) == 0
+def test_confidence_handles_zero_max():
+    assert confidence(50, 0) == (0, "Weak")
 
 
-# --- score_price ---
-
-def test_price_zero_diff(base_candidate, requested_product):
-    same_price = base_candidate.model_copy(update={"base_price": 10.0})
-    assert score_price(same_price, requested_product) == 20
-
-
-def test_price_ten_pct_diff(base_candidate, requested_product):
-    # +10% => 10.0 * 1.10 = 11.0 => score = 20 - 10*2 = 0
-    at_ten = base_candidate.model_copy(update={"base_price": 11.0})
-    assert score_price(at_ten, requested_product) == 0
+# --- price_factor -----------------------------------------------------------
+def test_price_factor_equal_or_cheaper_is_full():
+    assert price_factor(10.0, 10.0, 0.25) == 1.0
+    assert price_factor(10.0, 8.0, 0.25) == 1.0
 
 
-def test_price_cheaper(base_candidate, requested_product):
-    cheaper = base_candidate.model_copy(update={"base_price": 9.0})
-    assert score_price(cheaper, requested_product) == 20
+def test_price_factor_decays_linearly_to_threshold():
+    # +12.5% with a 25% ceiling -> halfway -> 0.5
+    assert price_factor(10.0, 11.25, 0.25) == pytest.approx(0.5)
 
 
-def test_price_over_ten_pct(base_candidate, requested_product):
-    over = base_candidate.model_copy(update={"base_price": 12.0})
-    assert score_price(over, requested_product) == 0
+def test_price_factor_at_or_above_threshold_is_zero():
+    assert price_factor(10.0, 12.5, 0.25) == 0.0
+    assert price_factor(10.0, 20.0, 0.25) == 0.0
 
 
-def test_price_base_price_zero_guard(base_candidate, requested_product):
-    zero_price = requested_product.model_copy(update={"base_price": 0.0})
-    assert score_price(base_candidate, zero_price) == 20
+# --- stock_factor -----------------------------------------------------------
+def test_stock_factor_meets_demand_is_half():
+    assert stock_factor(20, 20) == pytest.approx(0.5)
 
 
-def test_price_partial_diff(base_candidate, requested_product):
-    # +5% => 20 - 5*2 = 10
-    five_pct = base_candidate.model_copy(update={"base_price": 10.5})
-    assert score_price(five_pct, requested_product) == 10
+def test_stock_factor_double_demand_is_full():
+    assert stock_factor(40, 20) == 1.0
+    assert stock_factor(1000, 20) == 1.0
 
 
-# --- score_stock ---
-
-def test_stock_double_quantity(base_candidate):
-    # stock 150 >= 20*2=40 → 10
-    assert score_stock(base_candidate, 20) == 10
+def test_stock_factor_below_demand_degrades():
+    assert stock_factor(10, 20) == pytest.approx(0.25)
 
 
-def test_stock_exact_quantity(base_candidate):
-    # stock exactly equal to requested → 5
-    exact = base_candidate.model_copy(update={"stock_quantity": 20})
-    assert score_stock(exact, 20) == 5
+# --- unit_pack_factor -------------------------------------------------------
+def test_unit_pack_identical_is_full():
+    req = make_requested(unit="kg", pack_size=2)
+    cand = make_candidate(unit="kg", pack_size=2)
+    assert unit_pack_factor(req, cand) == 1.0
 
 
-def test_stock_below_quantity(base_candidate):
-    # stock 10 < requested 20 → filtered before scoring, but score should be 0 if called
-    low = base_candidate.model_copy(update={"stock_quantity": 10})
-    assert score_stock(low, 20) == 0
+def test_unit_pack_different_unit_is_zero():
+    req = make_requested(unit="kg")
+    cand = make_candidate(unit="lb")
+    assert unit_pack_factor(req, cand) == 0.0
 
 
-# --- score_unit_pack ---
-
-def test_unit_pack_both_match(base_candidate, requested_product):
-    assert score_unit_pack(base_candidate, requested_product) == 8
-
-
-def test_unit_only_match(base_candidate, requested_product):
-    diff_pack = base_candidate.model_copy(update={"pack_size": 5.0})
-    assert score_unit_pack(diff_pack, requested_product) == 4
+def test_unit_pack_same_unit_different_pack_is_partial():
+    req = make_requested(unit="kg", pack_size=2)
+    cand = make_candidate(unit="kg", pack_size=4)
+    factor = unit_pack_factor(req, cand)
+    assert 0.5 < factor < 1.0
 
 
-def test_unit_pack_neither(base_candidate, requested_product):
-    diff_both = base_candidate.model_copy(update={"unit": "g", "pack_size": 500.0})
-    assert score_unit_pack(diff_both, requested_product) == 0
+# --- score_candidate --------------------------------------------------------
+def test_perfect_candidate_scores_max(settings):
+    """Same category, preferred contract, cheaper, ample stock, same unit/pack."""
+    req = make_requested()
+    cand = make_candidate(base_price=9.0, contract_price=8.5, stock_quantity=200)
+    contract = [ContractItem(product_id=cand.id, contract_price=8.5, is_preferred=True)]
+    scored = score_candidate(
+        req,
+        cand,
+        category_similarity=1.0,
+        requested_effective_price=10.0,
+        contract_lookup=build_contract_lookup(contract),
+        requested_quantity=20,
+        settings=settings,
+    )
+    assert scored.breakdown.category_similarity == 30
+    assert scored.breakdown.contract_match == 25
+    assert scored.breakdown.price_similarity == 20
+    assert scored.breakdown.stock_availability == 10
+    assert scored.breakdown.unit_pack_similarity == 8
+    assert scored.final_score == 93
 
 
-# --- compute_confidence ---
-
-def test_confidence_excellent():
-    pct, label = compute_confidence(85)  # 85/93*100 = 91% → Excellent
-    assert label == "Excellent"
-    assert pct >= 86
-
-
-def test_confidence_good():
-    pct, label = compute_confidence(62)  # 62/93*100 = 67% → Good
-    assert label == "Good"
-    assert 65 <= pct <= 85
-
-
-def test_confidence_acceptable():
-    pct, label = compute_confidence(46)  # 46/93*100 = 49% → Acceptable
-    assert label == "Acceptable"
-    assert 40 <= pct <= 64
-
-
-def test_confidence_poor():
-    pct, label = compute_confidence(30)  # 30/93*100 = 32% → Poor
-    assert label == "Poor"
-    assert pct < 40
+def test_final_score_always_equals_breakdown_sum(settings):
+    req = make_requested()
+    cand = make_candidate(base_price=11.5, stock_quantity=25, pack_size=5)
+    scored = score_candidate(
+        req,
+        cand,
+        category_similarity=0.7,
+        requested_effective_price=10.0,
+        contract_lookup={},
+        requested_quantity=20,
+        settings=settings,
+    )
+    b = scored.breakdown
+    assert scored.final_score == (
+        b.category_similarity
+        + b.contract_match
+        + b.price_similarity
+        + b.stock_availability
+        + b.unit_pack_similarity
+    )
 
 
-def test_confidence_pct_formula():
-    # round(88/93*100) = round(94.6) = 95
-    pct, _ = compute_confidence(88)
-    assert pct == 95
+def test_non_contract_candidate_gets_zero_contract_points(settings):
+    req = make_requested()
+    cand = make_candidate(contract_price=None)
+    scored = score_candidate(
+        req,
+        cand,
+        category_similarity=1.0,
+        requested_effective_price=10.0,
+        contract_lookup={},
+        requested_quantity=20,
+        settings=settings,
+    )
+    assert scored.breakdown.contract_match == 0
+    assert scored.facts.is_under_contract is False
 
 
-# --- compute_total_score ---
+def test_contracted_but_not_preferred_gets_partial_points(settings):
+    req = make_requested()
+    cand = make_candidate(contract_price=9.5)
+    contract = [ContractItem(product_id=cand.id, contract_price=9.5, is_preferred=False)]
+    scored = score_candidate(
+        req,
+        cand,
+        category_similarity=1.0,
+        requested_effective_price=10.0,
+        contract_lookup=build_contract_lookup(contract),
+        requested_quantity=20,
+        settings=settings,
+    )
+    # 0.7 * 25 = 17.5 -> rounds to 18
+    assert scored.breakdown.contract_match == 18
+    assert scored.facts.is_preferred is False
 
-def test_total_score_full_match(base_candidate, requested_product, contract_items):
-    # same category, contracted, exact price, double stock, same unit+pack
-    same_price = base_candidate.model_copy(update={"base_price": 10.0, "stock_quantity": 150})
-    score, breakdown = compute_total_score(same_price, requested_product, contract_items, 20)
-    assert breakdown["category_similarity"] == 30
-    assert breakdown["contract_match"] == 25
-    assert breakdown["price_similarity"] == 20
-    assert breakdown["stock_availability"] == 10
-    assert breakdown["unit_pack_similarity"] == 8
-    assert score == 93
+
+# --- rank_candidates --------------------------------------------------------
+def test_rank_orders_by_score_and_truncates(settings):
+    req = make_requested()
+    high = make_candidate(id="high", contract_price=8.0, stock_quantity=200)
+    low = make_candidate(id="low", category_id="cat_chicken", base_price=12.0, stock_quantity=20)
+    scored = [
+        score_candidate(
+            req, c,
+            category_similarity=1.0,
+            requested_effective_price=10.0,
+            contract_lookup=build_contract_lookup(
+                [ContractItem(product_id="high", contract_price=8.0, is_preferred=True)]
+            ),
+            requested_quantity=20,
+            settings=settings,
+        )
+        for c in (low, high)
+    ]
+    ranked = rank_candidates(scored, max_results=1)
+    assert len(ranked) == 1
+    assert ranked[0].candidate.id == "high"

@@ -1,80 +1,122 @@
-import asyncio
-import logging
+"""FastAPI entry point for the Smart Substitution Engine AI service.
+
+Run locally:
+    uvicorn app.main:app --reload --port 8000
+
+Then open http://localhost:8000/docs for interactive Swagger docs.
+"""
+
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 
-from .config import settings
-from .pipeline import recommendation_pipeline
-from .schemas import ReplacementRequest, ReplacementResponse
+from app import __version__
+from app.config import get_settings
+from app.engine import build_engine
+from app.logging_config import configure_logging, get_logger
+from app.providers import probe_ollama
+from app.schemas import HealthResponse, ReplacementRequest, ReplacementResponse
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
+DESCRIPTION = """
+AI-powered **product replacement** service for the Smart Substitution Engine.
 
-async def _warm_up_ollama() -> None:
-    """Load Ollama model into memory before first real request."""
-    from langchain_ollama import ChatOllama
+When a requested product is out of stock, this service ranks the best alternative
+products for a given company using a **deterministic scoring model** and writes a
+short, human-friendly explanation with a local **Ollama** LLM.
 
-    retries = 3
-    for attempt in range(1, retries + 1):
-        try:
-            llm = ChatOllama(
-                model=settings.ollama_model,
-                base_url=settings.ollama_base_url,
-                num_ctx=4096,
-            )
-            await llm.ainvoke("warmup")
-            logger.info("Ollama warm-up complete (model: %s)", settings.ollama_model)
-            return
-        except Exception as e:
-            if attempt < retries:
-                logger.warning("Ollama warm-up attempt %d failed: %s — retrying in 2s", attempt, e)
-                await asyncio.sleep(2)
-            else:
-                logger.warning(
-                    "Ollama warm-up failed after %d attempts: %s — template fallback will be used",
-                    retries,
-                    e,
-                )
+**Scoring dimensions** (max 93 points):
+
+| Dimension | Max |
+|---|---|
+| Category similarity | 30 |
+| Contract match | 25 |
+| Price similarity | 20 |
+| Stock availability | 10 |
+| Unit / pack similarity | 8 |
+
+The LLM **never** chooses replacements — Python ranks them deterministically and
+Ollama only explains the result *after* ranking. If Ollama is unavailable, a
+deterministic template explanation is used instead.
+"""
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm up Ollama on startup so first real request isn't cold
-    asyncio.create_task(_warm_up_ollama())
+    configure_logging()
+    settings = get_settings()
+    app.state.settings = settings
+    app.state.engine = build_engine(settings)
+    logger.info(
+        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s)",
+        settings.service_name,
+        __version__,
+        settings.chat_model,
+        settings.embedding_backend,
+        settings.embedding_model,
+        app.state.engine.similarity.embedding_device or "n/a",
+        settings.enable_llm_explanations,
+    )
     yield
+    logger.info("Shutting down %s.", settings.service_name)
 
 
 app = FastAPI(
-    title="Smart Substitution Engine — AI Recommendation Service",
-    version="1.0.0",
+    title="Smart Substitution Engine — AI Service",
+    version=__version__,
+    description=DESCRIPTION,
     lifespan=lifespan,
+    contact={"name": "Python AI Engineer"},
+    openapi_tags=[
+        {"name": "system", "description": "Health and diagnostics."},
+        {"name": "recommendations", "description": "Replacement recommendations."},
+    ],
 )
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "ollama_model": settings.ollama_model}
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
 
 
-@app.post("/recommendations/replacements", response_model=ReplacementResponse)
-async def get_replacements(request: ReplacementRequest) -> ReplacementResponse:
-    try:
-        initial_state = {
-            "request": request,
-            "candidates": [],
-            "rejected": [],
-            "scored": [],
-            "replacements": [],
-            "no_candidates_reason": None,
-        }
-        result = await recommendation_pipeline.ainvoke(initial_state)
-    except Exception as e:
-        logger.exception("Pipeline error processing recommendation request: %s", e)
-        raise HTTPException(status_code=500, detail=f"Recommendation pipeline error: {e}")
-
-    return ReplacementResponse(
-        replacements=result.get("replacements", []),
-        rejected_candidates=result.get("rejected", []),
-        no_candidates_reason=result.get("no_candidates_reason"),
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    tags=["system"],
+    summary="Service + Ollama health check",
+)
+async def health(http_request: Request) -> HealthResponse:
+    settings = get_settings()
+    ollama = await probe_ollama(settings)
+    engine = getattr(http_request.app.state, "engine", None)
+    embeddings = {
+        "backend": settings.embedding_backend,
+        "model": settings.embedding_model,
+        "enabled": settings.enable_embeddings,
+        "available": bool(engine and engine.similarity.uses_embeddings),
+        "device": engine.similarity.embedding_device if engine else None,
+    }
+    return HealthResponse(
+        service=settings.service_name,
+        version=__version__,
+        ollama=ollama,
+        embeddings=embeddings,
     )
+
+
+@app.post(
+    "/recommendations/replacements",
+    response_model=ReplacementResponse,
+    tags=["recommendations"],
+    summary="Rank replacement products for an out-of-stock item",
+    response_description="Ranked replacements with score breakdowns and explanations.",
+)
+async def recommend_replacements(
+    request: ReplacementRequest, http_request: Request
+) -> ReplacementResponse:
+    engine = http_request.app.state.engine
+    return await engine.recommend(request)

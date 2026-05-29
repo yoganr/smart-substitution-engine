@@ -1,9 +1,18 @@
-fastapi>=0.115
-uvicorn[standard]>=0.30
-pydantic>=2.7
-pydantic-settings>=2.3
-langgraph>=0.2,<0.3
-langchain-ollama>=0.2,<0.3
+# --- Runtime dependencies for the Python AI Recommendation Service ---
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.35
+pydantic>=2.7,<3
+pydantic-settings>=2.3,<3
+
+# LangGraph workflow + LangChain/Ollama integration (1.x line)
+langgraph>=1.0.7,<1.1
+langchain-core>=1.2.7,<2
+langchain-ollama>=1.1,<2
+
+# Local embeddings for semantic similarity (BAAI/bge-m3).
+# Pulls torch. For GPU, install a CUDA torch build first, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+sentence-transformers>=3,<6
+
+# HTTP client (Ollama health probe; also pulled in transitively)
 httpx>=0.27
-pytest>=8.0
-pytest-asyncio>=0.23

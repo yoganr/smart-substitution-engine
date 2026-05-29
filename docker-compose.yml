@@ -44,7 +44,7 @@ services:
 
   ai-service:
     build:
-      context: .
+      context: ./ai-service
       args:
         # Set to "true" to bake bge-m3 into the image (offline-capable, larger).
         PRELOAD_EMBEDDING_MODEL: "false"

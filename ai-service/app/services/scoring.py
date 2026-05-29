@@ -31,6 +31,23 @@ def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, x))
 
 
+def confidence(final_score: int, max_total: float) -> tuple[int, str]:
+    """Map a raw score to a 0-100 confidence percentage and a human label."""
+    pct = 0 if max_total <= 0 else round(final_score / max_total * 100)
+    pct = max(0, min(100, pct))
+    if pct >= 85:
+        label = "Excellent"
+    elif pct >= 70:
+        label = "Strong"
+    elif pct >= 55:
+        label = "Good"
+    elif pct >= 40:
+        label = "Fair"
+    else:
+        label = "Weak"
+    return pct, label
+
+
 # --- Per-dimension factors (each returns a fraction in [0, 1]) ------------
 def price_factor(requested_price: float, candidate_price: float, max_increase_pct: float) -> float:
     """1.0 when candidate is equal/cheaper, decaying linearly to 0 at the
