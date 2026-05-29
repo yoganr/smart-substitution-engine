@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# .NET
+backend/**/obj/
+backend/**/bin/
+backend/**/*.user
+backend/appsettings.Development.json

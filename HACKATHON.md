@@ -38,7 +38,7 @@ Python AI Recommendation Service
 {
   "company": {
     "id": "company_001",
-    "name": "ABC Restaurant"
+    "name": "Marco's Italian Kitchen"
   },
   "requested_product": {
     "id": "product_001",
