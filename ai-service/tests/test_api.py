@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 def client(monkeypatch):
     monkeypatch.setenv("SSE_ENABLE_EMBEDDINGS", "false")
     monkeypatch.setenv("SSE_ENABLE_LLM_EXPLANATIONS", "false")
+    monkeypatch.setenv("SSE_ENABLE_MILVUS", "false")
     from app.config import get_settings
 
     get_settings.cache_clear()
@@ -105,3 +106,23 @@ def test_openapi_schema_exposes_endpoints(client):
     spec = client.get("/openapi.json").json()
     assert "/recommendations/replacements" in spec["paths"]
     assert "/health" in spec["paths"]
+    assert "/index/products" in spec["paths"]
+    assert "/search/similar" in spec["paths"]
+
+
+def test_health_reports_vector_store(client):
+    body = client.get("/health").json()
+    assert body["vector_store"]["backend"] == "milvus"
+    # Milvus disabled in tests -> reported unavailable, not crashing.
+    assert body["vector_store"]["available"] is False
+
+
+def test_vector_endpoints_503_when_milvus_disabled(client):
+    # Milvus is disabled in the test fixture -> endpoints degrade with 503.
+    r1 = client.post("/index/products", json={"products": [
+        {"id": "p1", "name": "Chicken Breast 2kg", "category_id": "cat_chicken"}
+    ]})
+    assert r1.status_code == 503
+
+    r2 = client.post("/search/similar", json={"name": "Chicken Breast 2kg", "top_k": 3})
+    assert r2.status_code == 503

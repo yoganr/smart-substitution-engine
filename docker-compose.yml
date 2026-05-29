@@ -4,24 +4,96 @@
 #   docker compose up --build
 #
 # Services:
-#   ollama       - local LLM server (text generation)
-#   ollama-init  - one-shot: pulls the qwen3.5:0.8b chat model, then exits
-#   ai-service   - FastAPI + LangGraph + sentence-transformers (bge-m3, CPU)
+#   etcd / minio / milvus  - Milvus standalone vector DB (product embeddings)
+#   attu                   - Milvus web UI            -> http://localhost:8002
+#   ollama / ollama-init   - local LLM (text gen); auto-pulls qwen3.5:0.8b
+#   ai-service             - FastAPI + LangGraph + sentence-transformers (bge-m3, CPU)
+#   ui                     - Streamlit demo UI       -> http://localhost:8501
 #
-# The .NET backend (owned by the other engineer) is NOT included here — it calls
-# this service at http://localhost:8000 (see INTEGRATION.md).
+# The .NET backend (other engineer) is NOT included here — it calls this service
+# at http://localhost:8000 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
+# first start downloads models + images.
 # =============================================================================
 
 services:
+  # ---------------- Milvus standalone (vector DB) ----------------
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    container_name: sse-milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd-data:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: sse-milvus-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data --console-address ":9001"
+    volumes:
+      - minio-data:/minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  milvus:
+    image: milvusdb/milvus:v2.6.17
+    container_name: sse-milvus
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      start_period: 90s
+      timeout: 20s
+      retries: 6
+    ports:
+      - "19530:19530"   # gRPC (pymilvus)
+      - "9091:9091"     # health/metrics
+    depends_on:
+      - etcd
+      - minio
+    restart: unless-stopped
+
+  attu:
+    image: zilliz/attu:latest
+    container_name: sse-milvus-attu
+    environment:
+      - MILVUS_URL=milvus:19530
+    ports:
+      - "8002:3000"
+    depends_on:
+      - milvus
+    restart: unless-stopped
+
+  # ---------------- Ollama (text generation) ----------------
   ollama:
     image: ollama/ollama:latest
     container_name: sse-ollama
     volumes:
       - ollama-models:/root/.ollama
-    # Not published to the host by default, to avoid clashing with a host Ollama
-    # already on :11434. Uncomment to expose it:
-    # ports:
-    #   - "11435:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -30,7 +102,6 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Pulls the chat model into the ollama volume once, then exits (code 0).
   ollama-init:
     image: ollama/ollama:latest
     container_name: sse-ollama-init
@@ -42,16 +113,18 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama pull qwen3.5:0.8b"]
     restart: "no"
 
+  # ---------------- AI recommendation service ----------------
   ai-service:
     build:
       context: ./ai-service
       args:
-        # Set to "true" to bake bge-m3 into the image (offline-capable, larger).
         PRELOAD_EMBEDDING_MODEL: "false"
     image: sse-ai:latest
     container_name: sse-ai
     depends_on:
       ollama:
+        condition: service_healthy
+      milvus:
         condition: service_healthy
     environment:
       - SSE_OLLAMA_BASE_URL=http://ollama:11434
@@ -59,9 +132,11 @@ services:
       - SSE_EMBEDDING_BACKEND=sentence_transformers
       - SSE_EMBEDDING_MODEL=BAAI/bge-m3
       - SSE_EMBEDDING_DEVICE=cpu
+      - SSE_ENABLE_MILVUS=true
+      - SSE_MILVUS_URI=http://milvus:19530
+      - SSE_MILVUS_COLLECTION=product_embeddings
       - HF_HOME=/cache/huggingface
     volumes:
-      # Persists the downloaded bge-m3 weights across restarts (first run ~2.3GB).
       - hf-cache:/cache/huggingface
     ports:
       - "8000:8000"
@@ -74,10 +149,28 @@ services:
       interval: 15s
       timeout: 5s
       retries: 20
-      start_period: 180s   # first start downloads + loads the embedding model
+      start_period: 180s
+    restart: unless-stopped
+
+  # ---------------- Streamlit demo UI ----------------
+  ui:
+    build:
+      context: ./ui
+    image: sse-ui:latest
+    container_name: sse-ui
+    depends_on:
+      ai-service:
+        condition: service_healthy
+    environment:
+      - AI_SERVICE_URL=http://ai-service:8000
+    ports:
+      - "8501:8501"
     restart: unless-stopped
 
 volumes:
+  etcd-data:
+  minio-data:
+  milvus-data:
   ollama-models:
   hf-cache:
 

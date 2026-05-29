@@ -404,3 +404,19 @@ A ready-made payload lives at [`ai-service/examples/sample_request.json`](ai-ser
 
 Ping the AI engineer if you need extra fields on the candidate payload — adding
 optional fields is backward-compatible on both sides.
+
+---
+
+## 7. Bonus: vector-search endpoints (optional, not part of the contract)
+
+The Python service also exposes a **Milvus**-backed vector store. These are
+**additive** and do **not** affect the recommendation contract above — the .NET
+side does not need to call them:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /index/products` | Bulk-load products (id, name, category_id, dietary_tags) into the vector DB |
+| `POST /search/similar` | Find catalog products most similar to a query (ANN, cosine) |
+
+Useful if you later want a "find similar products" feature backed by embeddings.
+Both return `503` if Milvus is disabled. See the README "Vector search" section.

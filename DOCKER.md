@@ -1,25 +1,33 @@
 # Running the AI Service with Docker
 
-A self-contained stack: the Python AI service **and** Ollama, wired together.
-One command brings up everything; the only thing outside is the .NET backend
-(which just calls `http://localhost:8000`).
+A self-contained stack: a Streamlit **UI**, the Python **AI service**, **Ollama**
+(text gen), and a **Milvus** vector DB, wired together. One command brings up
+everything; the only thing outside is the .NET backend (which calls
+`http://localhost:8000`).
 
 ```
-┌─────────────────────────────────────────────┐
-│ docker compose                                │
-│                                               │
-│   ai-service  ──REST──►  ollama               │
-│   (FastAPI +             (qwen3.5:0.8b)        │
-│    bge-m3 on CPU)                             │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ docker compose                                                 │
+│                                                                │
+│   ui ──REST──► ai-service ──REST──► ollama   (qwen3.5:0.8b)    │
+│   (Streamlit)  (FastAPI +  ──gRPC──► milvus ─► etcd + minio    │
+│    :8501        bge-m3 CPU)            attu (UI :8002)         │
+└──────────────────────────────────────────────────────────────┘
         ▲
-        │ http://localhost:8000
-   .NET backend (on host)
+        │ http://localhost:8000   (.NET backend on host)
 ```
+
+| Service | Purpose | Host port |
+|---|---|---|
+| `ui` | Streamlit demo UI | 8501 |
+| `ai-service` | FastAPI recommendation + search API | 8000 |
+| `ollama` (+`ollama-init`) | LLM explanations (qwen3.5:0.8b) | — |
+| `milvus` (+`etcd`,`minio`) | Vector DB for product embeddings | 19530 |
+| `attu` | Milvus web UI | 8002 |
 
 ## Prerequisites
 - Docker Engine + Compose v2 (`docker compose version`)
-- ~6 GB free disk (images + model weights), internet for the first run
+- ~8 GB free disk + ~6 GB RAM (Milvus + models), internet for the first run
 
 ## Start it
 
@@ -28,21 +36,30 @@ docker compose up --build
 ```
 
 What happens on first start:
-1. `ollama` container boots.
-2. `ollama-init` pulls **qwen3.5:0.8b** into a persistent volume, then exits.
-3. `ai-service` builds, then downloads **BAAI/bge-m3** (~2.3 GB) into a cache
-   volume and loads it on CPU.
+1. `etcd` + `minio` + `milvus` boot (Milvus is healthy in ~30–90s).
+2. `ollama` boots; `ollama-init` pulls **qwen3.5:0.8b**, then exits.
+3. `ai-service` builds, downloads **BAAI/bge-m3** (~2.3 GB) into a cache volume,
+   loads it on CPU, and connects to Milvus.
 
-> ⏳ The **first** start can take several minutes (model downloads). Subsequent
-> starts are fast — both models are cached in named volumes. The `ai-service`
-> health check has a 180s grace period to cover the first-run download.
+> ⏳ The **first** start can take several minutes (image + model downloads).
+> Subsequent starts are fast — models and vectors persist in named volumes. The
+> `ai-service` health check has a 180s grace period for the first-run download.
+
+Seed the vector DB with a sample catalog (optional, for `/search/similar`):
+
+```bash
+docker compose exec ai-service python examples/seed_milvus.py
+```
 
 Run detached: `docker compose up --build -d`
 
 ## Verify
 
+Open the **demo UI** at <http://localhost:8501> — pick a scenario and click
+"Find replacements". Or via the API:
+
 ```bash
-# Health (also shows embedding backend/device and Ollama status)
+# Health (also shows embedding backend/device, Ollama + Milvus status)
 curl http://localhost:8000/health
 
 # A real recommendation
@@ -51,7 +68,9 @@ curl -X POST http://localhost:8000/recommendations/replacements \
   -d @ai-service/examples/sample_request.json
 ```
 
-Swagger UI: <http://localhost:8000/docs>
+- Demo UI: <http://localhost:8501>
+- Swagger UI: <http://localhost:8000/docs>
+- Milvus UI (Attu): <http://localhost:8002>
 
 ## Everyday commands
 

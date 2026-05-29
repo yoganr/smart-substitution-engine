@@ -1,0 +1,4 @@
+# --- Streamlit demo UI for the Smart Substitution Engine ---
+streamlit>=1.36,<2
+requests>=2.31
+pandas>=2.0

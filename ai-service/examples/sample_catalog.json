@@ -1,0 +1,20 @@
+[
+  { "id": "product_001", "name": "Chicken Breast 2kg", "category_id": "chicken", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_2033", "name": "Chicken Breast Premium 2kg", "category_id": "chicken", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_2099", "name": "Organic Chicken Breast 2kg", "category_id": "chicken", "is_active": true, "dietary_tags": ["halal", "organic"] },
+  { "id": "product_3001", "name": "Chicken Thigh Fillet 2kg", "category_id": "poultry", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_3002", "name": "Whole Chicken 1.5kg", "category_id": "poultry", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_3003", "name": "Turkey Breast 2kg", "category_id": "poultry", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_4001", "name": "Beef Sirloin 2kg", "category_id": "beef", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_4002", "name": "Beef Mince 1kg", "category_id": "beef", "is_active": true, "dietary_tags": ["halal"] },
+  { "id": "product_5001", "name": "Pork Loin 2kg", "category_id": "pork", "is_active": true, "dietary_tags": [] },
+  { "id": "product_5002", "name": "Pork Sausages 1kg", "category_id": "pork", "is_active": true, "dietary_tags": [] },
+  { "id": "product_6001", "name": "Atlantic Salmon Fillet 1kg", "category_id": "fish", "is_active": true, "dietary_tags": ["pescatarian"] },
+  { "id": "product_6002", "name": "Cod Fillet 1kg", "category_id": "fish", "is_active": true, "dietary_tags": ["pescatarian"] },
+  { "id": "product_7001", "name": "Tofu Firm 500g", "category_id": "plant_protein", "is_active": true, "dietary_tags": ["vegan", "gluten_free"] },
+  { "id": "product_7002", "name": "Plant-Based Chicken Strips 500g", "category_id": "plant_protein", "is_active": true, "dietary_tags": ["vegan"] },
+  { "id": "product_8001", "name": "Fresh Carrots 5kg", "category_id": "vegetables", "is_active": true, "dietary_tags": ["vegan", "gluten_free"] },
+  { "id": "product_8002", "name": "Broccoli 2kg", "category_id": "vegetables", "is_active": true, "dietary_tags": ["vegan", "gluten_free"] },
+  { "id": "product_9001", "name": "Cheddar Cheese 1kg", "category_id": "dairy", "is_active": true, "dietary_tags": ["vegetarian"] },
+  { "id": "product_9002", "name": "Discontinued Chicken Nuggets 1kg", "category_id": "chicken", "is_active": false, "dietary_tags": ["halal"] }
+]

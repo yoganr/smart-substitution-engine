@@ -9,6 +9,7 @@ while letting the live service be genuinely "smart".
 
 from __future__ import annotations
 
+import asyncio
 import math
 from difflib import SequenceMatcher
 from typing import Optional, Protocol, Sequence
@@ -63,17 +64,64 @@ class SimilarityService:
     "compatible category".
     """
 
-    def __init__(self, embeddings: Optional[EmbeddingsProvider] = None) -> None:
+    def __init__(self, embeddings: Optional[EmbeddingsProvider] = None, store=None) -> None:
         self._embeddings = embeddings
+        self._store = store  # Optional MilvusVectorStore (embedding cache)
 
     @property
     def uses_embeddings(self) -> bool:
         return self._embeddings is not None
 
     @property
+    def uses_milvus(self) -> bool:
+        return self._store is not None
+
+    @property
     def embedding_device(self) -> Optional[str]:
         """Device the embedding model runs on (e.g. 'cuda:0'), if available."""
         return getattr(self._embeddings, "device", None)
+
+    async def _vectors_for(self, products: Sequence) -> dict[str, list[float]]:
+        """Resolve embeddings for products, using Milvus as a cache: fetch cached
+        vectors, embed only the misses, and write them back. Falls back to plain
+        embedding when there is no store."""
+        by_id = {p.id: p for p in products}
+        ids = list(by_id)
+        vectors: dict[str, list[float]] = {}
+
+        if self._store is not None:
+            try:
+                vectors.update(await asyncio.to_thread(self._store.fetch_vectors, ids))
+            except Exception:  # pragma: no cover - live-server failure path
+                logger.warning("Milvus fetch failed; embedding fresh.", exc_info=True)
+
+        missing = [pid for pid in ids if pid not in vectors]
+        if missing and self._embeddings is not None:
+            try:
+                new = await self._embeddings.aembed_documents(
+                    [_describe(by_id[pid]) for pid in missing]
+                )
+                new_map = dict(zip(missing, new))
+                vectors.update(new_map)
+                if self._store is not None:
+                    rows = [
+                        {
+                            "id": pid,
+                            "vector": new_map[pid],
+                            "name": by_id[pid].name,
+                            "category_id": by_id[pid].category_id,
+                            "is_active": getattr(by_id[pid], "is_active", True),
+                            "dietary_tags": getattr(by_id[pid], "dietary_tags", []),
+                        }
+                        for pid in missing
+                    ]
+                    try:
+                        await asyncio.to_thread(self._store.upsert, rows)
+                    except Exception:  # pragma: no cover
+                        logger.warning("Milvus upsert failed.", exc_info=True)
+            except Exception:  # pragma: no cover - network/runtime failure path
+                logger.warning("Embedding failed; will use lexical similarity.", exc_info=True)
+        return vectors
 
     async def category_similarities(
         self, requested: RequestedProduct, candidates: Sequence[CandidateProduct]
@@ -91,22 +139,12 @@ class SimilarityService:
         if not non_exact:
             return sims
 
-        if self._embeddings is not None:
-            try:
-                query = _describe(requested)
-                docs = [_describe(c) for c in non_exact]
-                vectors = await self._embeddings.aembed_documents([query, *docs])
-                query_vec, cand_vecs = vectors[0], vectors[1:]
-                for cand, vec in zip(non_exact, cand_vecs):
-                    sims[cand.id] = cosine_similarity(query_vec, vec)
-                return sims
-            except Exception:  # pragma: no cover - network/runtime failure path
-                logger.warning(
-                    "Embedding similarity failed; falling back to lexical similarity.",
-                    exc_info=True,
-                )
-
-        # Lexical fallback for the non-exact candidates.
+        vectors = await self._vectors_for([requested, *non_exact])
+        req_vec = vectors.get(requested.id)
         for cand in non_exact:
-            sims[cand.id] = lexical_similarity(requested.name, cand.name)
+            cand_vec = vectors.get(cand.id)
+            if req_vec is not None and cand_vec is not None:
+                sims[cand.id] = cosine_similarity(req_vec, cand_vec)
+            else:
+                sims[cand.id] = lexical_similarity(requested.name, cand.name)
         return sims

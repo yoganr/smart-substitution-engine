@@ -179,3 +179,50 @@ class HealthResponse(BaseModel):
     version: str
     ollama: dict
     embeddings: dict
+    vector_store: dict
+
+
+# ---------------------------------------------------------------------------
+# Vector-search endpoints (Milvus-backed)
+# ---------------------------------------------------------------------------
+class IndexProduct(BaseModel):
+    id: str = Field(..., examples=["product_2033"])
+    name: str = Field(..., examples=["Chicken Breast Premium 2kg"])
+    category_id: str = Field(..., examples=["cat_chicken"])
+    is_active: bool = True
+    dietary_tags: list[str] = Field(default_factory=list)
+
+
+class IndexProductsRequest(BaseModel):
+    products: list[IndexProduct]
+
+
+class IndexProductsResponse(BaseModel):
+    indexed: int
+    collection: str
+    total_in_collection: int
+
+
+class SearchSimilarRequest(BaseModel):
+    name: Optional[str] = Field(default=None, examples=["Chicken Breast 2kg"])
+    category_id: Optional[str] = Field(default=None, examples=["cat_chicken"])
+    product_id: Optional[str] = Field(
+        default=None, description="Use an already-indexed product's vector as the query."
+    )
+    top_k: int = Field(default=5, ge=1, le=100)
+    exclude_ids: list[str] = Field(default_factory=list)
+    active_only: bool = True
+
+
+class SearchHit(BaseModel):
+    product_id: str
+    name: str
+    category_id: str
+    score: float
+    is_active: bool = True
+    dietary_tags: list[str] = Field(default_factory=list)
+
+
+class SearchSimilarResponse(BaseModel):
+    count: int
+    results: list[SearchHit] = Field(default_factory=list)

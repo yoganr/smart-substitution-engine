@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"  # HF id for sentence-transformers; Ollama tag if backend=ollama
     embedding_device: Optional[str] = None  # None=auto (cuda if available), or "cpu"/"cuda"
 
+    # --- Vector store (Milvus) ---
+    enable_milvus: bool = True
+    milvus_uri: str = "http://localhost:19530"
+    milvus_token: str = ""  # "user:password" if auth is enabled
+    milvus_collection: str = "product_embeddings"
+    embedding_dim: int = 1024  # bge-m3 output dimension
+
     # --- Feature toggles ---
     enable_embeddings: bool = True
     enable_llm_explanations: bool = True

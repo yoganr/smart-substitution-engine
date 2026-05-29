@@ -6,11 +6,12 @@ optimal products balancing **price and quality**, ensures **category/allergen
 compatibility**, and prioritizes **suppliers the customer already has contracts
 with**.
 
-This is a monorepo with two services:
+This is a monorepo with three parts:
 
 | Folder | Owner | Stack |
 |---|---|---|
-| [`ai-service/`](ai-service/) | Python AI Engineer | FastAPI · LangGraph · sentence-transformers · Ollama |
+| [`ai-service/`](ai-service/) | Python AI Engineer | FastAPI · LangGraph · sentence-transformers · Milvus · Ollama |
+| [`ui/`](ui/) | Python AI Engineer | Streamlit demo UI (→ AI service) |
 | [`backend/`](backend/) | .NET Engineer | ASP.NET Core · MongoDB Atlas |
 
 The .NET backend calls the Python AI service at `http://localhost:8000` — see
@@ -19,11 +20,48 @@ for the full plan. This README documents the **Python AI service** (`ai-service/
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TB
+    UI["🖥️ Streamlit UI<br/>:8501"]
+    NET["🟦 .NET Backend<br/>(CRUD, logs)"]
+    DB[("🍃 MongoDB Atlas")]
+
+    subgraph AI["⚙️ Python AI Service · FastAPI + LangGraph · :8000"]
+        SCORE["Deterministic scoring<br/>+ ranking (max 93)"]
+        EMB["bge-m3 embeddings<br/>sentence-transformers · in-process"]
+    end
+
+    OL["🤖 Ollama<br/>qwen3.5:0.8b"]
+    MV[("🔢 Milvus vector DB<br/>:19530")]
+
+    UI -->|REST| AI
+    NET -->|"POST /recommendations/replacements"| AI
+    NET <-->|"reads / writes"| DB
+    AI -->|"explanations (template fallback)"| OL
+    AI -->|"store + ANN search (lexical fallback)"| MV
+
+    classDef svc fill:#eef2ff,stroke:#6366f1;
+    class AI svc;
+```
+
+> The LLM never picks replacements — Python ranks deterministically and Ollama
+> only explains. Every external dependency (Ollama, Milvus, embeddings) has a
+> fallback, so the service degrades gracefully instead of failing.
+
+---
+
 ## How it works
 
-```
-validate_input → apply_hard_filters → score_candidates → rank_replacements
-              → generate_ollama_explanations → return_result
+```mermaid
+flowchart LR
+    A[validate_input] --> B[apply_hard_filters]
+    B -->|survivors| C[score_candidates]
+    B -->|none| F[return_result]
+    C --> D[rank_replacements]
+    D --> E[generate_ollama_explanations]
+    E --> F
 ```
 
 1. **Hard filters** remove ineligible candidates (inactive, out of stock, same
@@ -48,24 +86,32 @@ validate_input → apply_hard_filters → score_candidates → rank_replacements
   "Chicken Thigh Fillet" is a closer substitute for "Chicken Breast" than "Frozen
   Carrots" — even across category boundaries — with a deterministic lexical
   fallback when embeddings are off.
+- **Milvus vector store**: product embeddings are persisted in a Milvus vector DB
+  (`pymilvus`) — used as an embedding cache in the scoring flow and exposed via
+  `POST /index/products` + `POST /search/similar` for catalog-wide ANN retrieval.
+  Falls back to in-process embeddings if Milvus is unavailable.
 - **Grounded explanations**: the LLM is fed only verified facts (never asked to
   invent prices/brands), so explanations are trustworthy.
-- **Graceful degradation**: works with Ollama fully on, embeddings only, or
-  completely offline (template explanations) — never crashes.
+- **Graceful degradation**: works with Ollama on/off, embeddings on/off, Milvus
+  on/off — every layer has a fallback, so it never crashes.
 
 ---
 
 ## Quickstart
 
-### Option A — Docker (self-contained: AI service + Ollama)
+### Option A — Docker (self-contained: UI + AI service + Milvus + Ollama)
 
 ```bash
 docker compose up --build
 ```
 
-Brings up the AI service **and** Ollama, auto-pulls `qwen3.5:0.8b`, and serves on
-<http://localhost:8000>. See [`DOCKER.md`](DOCKER.md) for details. First run
-downloads the models (~minutes); after that it's instant.
+Brings up the whole stack, auto-pulls `qwen3.5:0.8b`, and serves:
+- **Demo UI** → <http://localhost:8501>
+- AI service / Swagger → <http://localhost:8000/docs>
+- Milvus UI (Attu) → <http://localhost:8002>
+
+See [`DOCKER.md`](DOCKER.md) for details. First run downloads the models
+(~minutes); after that it's instant.
 
 ### Option B — Local Python
 
@@ -98,6 +144,31 @@ curl -X POST http://localhost:8000/recommendations/replacements `
 
 ---
 
+## Demo UI (Streamlit)
+
+A point-and-click UI for demos lives in [`ui/`](ui/). It talks directly to the
+AI service (no MongoDB needed) and has two tabs:
+
+- **🔁 Replacements** — pick a scenario, edit the out-of-stock product + candidate
+  table, and see ranked replacements with confidence badges, per-dimension score
+  bars, Ollama explanations, and the rejected-candidate reasons.
+- **🔍 Vector Search** — index a sample catalog into Milvus and run similarity
+  search over it.
+
+```powershell
+# With Docker: included in `docker compose up`  ->  http://localhost:8501
+
+# Or locally (AI service must be running on :8000):
+cd ui
+python -m pip install -r requirements.txt
+streamlit run app.py            # opens http://localhost:8501
+```
+
+Point it at a different AI service with `AI_SERVICE_URL` (env var) or the field
+in the sidebar.
+
+---
+
 ## Configuration
 
 All settings are environment variables prefixed `SSE_` (or a local `.env`).
@@ -111,9 +182,36 @@ Copy [`.env.example`](.env.example) and adjust. Highlights:
 | `SSE_EMBEDDING_DEVICE` | _(auto)_ | `cpu` / `cuda`; blank = auto-detect GPU |
 | `SSE_ENABLE_EMBEDDINGS` | `true` | Toggle semantic similarity (off → lexical) |
 | `SSE_ENABLE_LLM_EXPLANATIONS` | `true` | Toggle LLM (off → template explanations) |
+| `SSE_ENABLE_MILVUS` | `true` | Toggle the Milvus vector store (off → in-process only) |
+| `SSE_MILVUS_URI` | `http://localhost:19530` | Milvus endpoint (`http://milvus:19530` in Docker) |
 | `SSE_W_CATEGORY` … `SSE_W_UNIT_PACK` | 30/25/20/10/8 | Scoring weights (tune Day 3) |
 | `SSE_MAX_PRICE_INCREASE_PCT` | `0.25` | Reject candidates pricier than +25% |
 | `SSE_ALLOW_CROSS_CATEGORY` | `true` | Allow semantically-compatible categories |
+| `SSE_ENFORCE_DIETARY_TAGS` | `true` | Allergen/dietary hard filter |
+
+---
+
+## Vector search (Milvus)
+
+Product embeddings are stored in **Milvus** and exposed for catalog-wide
+similarity search:
+
+```powershell
+# 1. Start Milvus (or the whole stack with `docker compose up`)
+docker compose -f ai-service/milvus-standalone-docker-compose.yml up -d
+
+# 2. Seed a sample catalog (from ai-service/)
+cd ai-service && python examples/seed_milvus.py
+
+# 3. Search the catalog by vector similarity
+curl -X POST http://localhost:8000/search/similar `
+  -H "Content-Type: application/json" `
+  -d '{"name": "Chicken Breast 2kg", "top_k": 5}'
+```
+
+`POST /index/products` bulk-loads products; `POST /search/similar` returns the
+nearest neighbours (ANN, cosine). Browse the data in **Attu** at
+<http://localhost:8002>. Both endpoints return `503` when Milvus is disabled.
 
 ---
 
@@ -125,8 +223,8 @@ python -m pytest                 # offline unit + API + contract tests (no Ollam
 python -m pytest -m integration  # live tests against a running Ollama
 ```
 
-The offline suite mocks Ollama, so it is fast and deterministic. Integration
-tests auto-skip when Ollama is not reachable.
+The offline suite mocks Ollama + Milvus, so it is fast and deterministic.
+Integration tests auto-skip when Ollama / Milvus are not reachable.
 
 ---
 
@@ -140,19 +238,23 @@ ai-service/                 ← this service (run commands from here)
     schemas.py         Pydantic request/response models (the .NET contract)
     engine.py          Wires providers → services → graph
     providers.py       Ollama chat + sentence-transformers embeddings (+ health probe)
+    vectorstore.py     Milvus vector store (upsert / fetch / ANN search)
     services/
       filters.py       Hard filters (incl. dietary/allergen safety)
       scoring.py       Deterministic scoring + ranking + confidence (pure, no I/O)
-      similarity.py    Semantic (embedding) + lexical similarity
+      similarity.py    Semantic similarity (Milvus-cached embeddings) + lexical
       explanation.py   Grounded LLM explanations + template fallback
+      retrieval.py     Catalog indexing + vector search (the /index, /search endpoints)
     graph/
       state.py         LangGraph shared state
       nodes.py         Node implementations
       workflow.py      Graph wiring (the 6 nodes above)
-  tests/               Unit, API, contract, and live-integration tests
-  examples/            Sample request + flow tracer
+  tests/               Unit, API, contract, and live-integration tests (Ollama + Milvus)
+  examples/            Sample request, flow tracer, Milvus seed + catalog
   Dockerfile          CPU image (build context = ai-service/)
+  milvus-standalone-docker-compose.yml   Run Milvus on its own
   requirements.txt
+ui/                         ← Streamlit demo UI (app.py, Dockerfile)
 backend/                    ← .NET service (owned by the .NET engineer)
-docker-compose.yml          ← root: ai-service + Ollama
+docker-compose.yml          ← root: ui + ai-service + Milvus + Ollama
 ```
