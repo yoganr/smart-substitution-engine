@@ -14,6 +14,9 @@
 # at http://localhost:8000 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
 # first start downloads models + images.
 # =============================================================================
+# docker compose up --build -d
+# docker compose logs -f ai-service
+# docker compose down -v
 
 services:
   # ---------------- Milvus standalone (vector DB) ----------------

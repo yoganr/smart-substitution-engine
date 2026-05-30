@@ -1,7 +1,7 @@
-"""Streamlit demo UI for the Smart Substitution Engine AI service.
+"""Smart Substitution Engine — demo UI (Streamlit).
 
-Talks directly to the Python AI service (default http://localhost:8000) so it is
-fully self-contained — no MongoDB / .NET backend needed for the demo.
+Talks directly to the AI service (default http://localhost:8000) so it is fully
+self-contained — no database or .NET backend needed for the demo.
 
 Run locally:
     cd ui
@@ -18,10 +18,10 @@ import requests
 import streamlit as st
 
 AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8000").rstrip("/")
-TIMEOUT = 90  # LLM explanations can take a few seconds
+TIMEOUT = 90  # explanations can take a few seconds
 
 LABEL_COLORS = {
-    "Excellent": "#16a34a",
+    "Excellent": "#15803d",
     "Strong": "#2563eb",
     "Good": "#0891b2",
     "Fair": "#d97706",
@@ -32,7 +32,7 @@ DIMENSIONS = [
     ("contract_match", "Contract", 25),
     ("price_similarity", "Price", 20),
     ("stock_availability", "Stock", 10),
-    ("unit_pack_similarity", "Unit/Pack", 8),
+    ("unit_pack_similarity", "Unit / pack", 8),
 ]
 
 # --------------------------------------------------------------------------- #
@@ -41,25 +41,25 @@ DIMENSIONS = [
 PRESETS: dict[str, dict] = {
     "Chicken Breast — out of stock": {
         "requested": {
-            "id": "product_001", "name": "Chicken Breast 2kg", "category_id": "cat_chicken",
+            "id": "product_001", "name": "Chicken Breast 2kg", "category_id": "chicken",
             "brand": "Brand A", "unit": "kg", "pack_size": 2.0, "base_price": 10.0,
             "dietary_tags": "halal",
         },
         "quantity": 20,
         "candidates": [
-            {"id": "product_2033", "name": "Chicken Breast Premium 2kg", "category_id": "cat_chicken",
+            {"id": "product_2033", "name": "Chicken Breast Premium 2kg", "category_id": "chicken",
              "brand": "Brand B", "unit": "kg", "pack_size": 2.0, "base_price": 10.5,
              "stock_quantity": 150, "contract_price": 9.5, "is_preferred": True, "is_active": True,
              "dietary_tags": "halal"},
-            {"id": "product_2099", "name": "Organic Chicken Breast 2kg", "category_id": "cat_chicken",
+            {"id": "product_2099", "name": "Organic Chicken Breast 2kg", "category_id": "chicken",
              "brand": "Brand C", "unit": "kg", "pack_size": 2.0, "base_price": 11.0,
              "stock_quantity": 40, "contract_price": None, "is_preferred": False, "is_active": True,
              "dietary_tags": "halal,organic"},
-            {"id": "product_3001", "name": "Chicken Thigh Fillet 2kg", "category_id": "cat_poultry",
+            {"id": "product_3001", "name": "Chicken Thigh Fillet 2kg", "category_id": "poultry",
              "brand": "Brand D", "unit": "kg", "pack_size": 2.0, "base_price": 9.8,
              "stock_quantity": 80, "contract_price": None, "is_preferred": False, "is_active": True,
              "dietary_tags": "halal"},
-            {"id": "product_5001", "name": "Pork Loin 2kg", "category_id": "cat_pork",
+            {"id": "product_5001", "name": "Pork Loin 2kg", "category_id": "pork",
              "brand": "Brand X", "unit": "kg", "pack_size": 2.0, "base_price": 9.0,
              "stock_quantity": 120, "contract_price": None, "is_preferred": False, "is_active": True,
              "dietary_tags": ""},
@@ -67,17 +67,17 @@ PRESETS: dict[str, dict] = {
     },
     "Halal request — allergen filter blocks pork": {
         "requested": {
-            "id": "product_010", "name": "Beef Mince 1kg", "category_id": "cat_beef",
+            "id": "product_010", "name": "Beef Mince 1kg", "category_id": "beef",
             "brand": "Brand A", "unit": "kg", "pack_size": 1.0, "base_price": 12.0,
             "dietary_tags": "halal",
         },
         "quantity": 10,
         "candidates": [
-            {"id": "product_4001", "name": "Beef Sirloin 2kg", "category_id": "cat_beef",
+            {"id": "product_4001", "name": "Beef Sirloin 2kg", "category_id": "beef",
              "brand": "Brand B", "unit": "kg", "pack_size": 2.0, "base_price": 13.0,
              "stock_quantity": 60, "contract_price": 12.5, "is_preferred": True, "is_active": True,
              "dietary_tags": "halal"},
-            {"id": "product_5002", "name": "Pork Sausages 1kg", "category_id": "cat_pork",
+            {"id": "product_5002", "name": "Pork Sausages 1kg", "category_id": "pork",
              "brand": "Brand X", "unit": "kg", "pack_size": 1.0, "base_price": 8.0,
              "stock_quantity": 200, "contract_price": None, "is_preferred": False, "is_active": True,
              "dietary_tags": ""},
@@ -86,18 +86,18 @@ PRESETS: dict[str, dict] = {
 }
 
 SAMPLE_CATALOG = [
-    {"id": "product_001", "name": "Chicken Breast 2kg", "category_id": "cat_chicken", "is_active": True, "dietary_tags": ["halal"]},
-    {"id": "product_2033", "name": "Chicken Breast Premium 2kg", "category_id": "cat_chicken", "is_active": True, "dietary_tags": ["halal"]},
-    {"id": "product_2099", "name": "Organic Chicken Breast 2kg", "category_id": "cat_chicken", "is_active": True, "dietary_tags": ["halal", "organic"]},
-    {"id": "product_3001", "name": "Chicken Thigh Fillet 2kg", "category_id": "cat_poultry", "is_active": True, "dietary_tags": ["halal"]},
-    {"id": "product_3003", "name": "Turkey Breast 2kg", "category_id": "cat_poultry", "is_active": True, "dietary_tags": ["halal"]},
-    {"id": "product_4001", "name": "Beef Sirloin 2kg", "category_id": "cat_beef", "is_active": True, "dietary_tags": ["halal"]},
-    {"id": "product_5001", "name": "Pork Loin 2kg", "category_id": "cat_pork", "is_active": True, "dietary_tags": []},
-    {"id": "product_6001", "name": "Atlantic Salmon Fillet 1kg", "category_id": "cat_fish", "is_active": True, "dietary_tags": ["pescatarian"]},
-    {"id": "product_7001", "name": "Tofu Firm 500g", "category_id": "cat_plant_protein", "is_active": True, "dietary_tags": ["vegan", "gluten_free"]},
-    {"id": "product_7002", "name": "Plant-Based Chicken Strips 500g", "category_id": "cat_plant_protein", "is_active": True, "dietary_tags": ["vegan"]},
-    {"id": "product_8001", "name": "Fresh Carrots 5kg", "category_id": "cat_vegetables", "is_active": True, "dietary_tags": ["vegan", "gluten_free"]},
-    {"id": "product_9002", "name": "Discontinued Chicken Nuggets 1kg", "category_id": "cat_chicken", "is_active": False, "dietary_tags": ["halal"]},
+    {"id": "product_001", "name": "Chicken Breast 2kg", "category_id": "chicken", "is_active": True, "dietary_tags": ["halal"]},
+    {"id": "product_2033", "name": "Chicken Breast Premium 2kg", "category_id": "chicken", "is_active": True, "dietary_tags": ["halal"]},
+    {"id": "product_2099", "name": "Organic Chicken Breast 2kg", "category_id": "chicken", "is_active": True, "dietary_tags": ["halal", "organic"]},
+    {"id": "product_3001", "name": "Chicken Thigh Fillet 2kg", "category_id": "poultry", "is_active": True, "dietary_tags": ["halal"]},
+    {"id": "product_3003", "name": "Turkey Breast 2kg", "category_id": "poultry", "is_active": True, "dietary_tags": ["halal"]},
+    {"id": "product_4001", "name": "Beef Sirloin 2kg", "category_id": "beef", "is_active": True, "dietary_tags": ["halal"]},
+    {"id": "product_5001", "name": "Pork Loin 2kg", "category_id": "pork", "is_active": True, "dietary_tags": []},
+    {"id": "product_6001", "name": "Atlantic Salmon Fillet 1kg", "category_id": "fish", "is_active": True, "dietary_tags": ["pescatarian"]},
+    {"id": "product_7001", "name": "Tofu Firm 500g", "category_id": "plant_protein", "is_active": True, "dietary_tags": ["vegan", "gluten_free"]},
+    {"id": "product_7002", "name": "Plant-Based Chicken Strips 500g", "category_id": "plant_protein", "is_active": True, "dietary_tags": ["vegan"]},
+    {"id": "product_8001", "name": "Fresh Carrots 5kg", "category_id": "vegetables", "is_active": True, "dietary_tags": ["vegan", "gluten_free"]},
+    {"id": "product_9002", "name": "Discontinued Chicken Nuggets 1kg", "category_id": "chicken", "is_active": False, "dietary_tags": ["halal"]},
 ]
 
 CANDIDATE_COLUMNS = [
@@ -139,58 +139,190 @@ def _split_tags(value) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
-# UI
+# Styling
+# --------------------------------------------------------------------------- #
+CSS = """
+<style>
+  /* hide developer chrome */
+  [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
+  #MainMenu, footer { visibility:hidden; }
+
+  .stApp { background:#f6f7f9; }
+  .block-container { padding-top:1.4rem; padding-bottom:4rem; max-width:1180px; }
+
+  /* brand header */
+  .brand { display:flex; align-items:center; gap:14px; margin-bottom:2px; }
+  .brand .logo { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#4f46e5,#2563eb);
+                 display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 12px rgba(37,99,235,.25); }
+  .brand h1 { font-size:1.55rem; font-weight:800; letter-spacing:-.02em; margin:0; color:#0f172a; }
+  .brand .tag { color:#64748b; font-size:.9rem; margin-top:1px; }
+  .rule { height:1px; background:linear-gradient(90deg,#e2e8f0,transparent); margin:14px 0 4px; }
+
+  /* section labels */
+  .sec { text-transform:uppercase; letter-spacing:.07em; font-size:.72rem; font-weight:700; color:#94a3b8; margin:6px 0 2px; }
+
+  /* generic card */
+  .card { background:#fff; border:1px solid #e8ebf0; border-radius:14px; padding:16px 18px;
+          box-shadow:0 1px 3px rgba(15,23,42,.04); margin-bottom:14px; }
+
+  /* result card */
+  .rep-head { display:flex; align-items:flex-start; gap:14px; }
+  .rank { flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:#eef2ff; color:#4338ca;
+          font-weight:800; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+  .rep-main { flex:1; min-width:0; }
+  .rep-name { font-weight:700; font-size:1.06rem; color:#0f172a; }
+  .rep-sub { color:#64748b; font-size:.82rem; margin:2px 0 7px; }
+  .rep-right { text-align:right; flex:0 0 auto; min-width:118px; }
+  .conf { font-size:1.6rem; font-weight:800; line-height:1; }
+  .conf-label { font-size:.74rem; font-weight:700; margin-top:1px; }
+  .fit { font-size:.72rem; color:#94a3b8; margin-top:3px; }
+
+  .chip { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.7rem; font-weight:700;
+          background:#f1f5f9; color:#475569; margin-right:6px; }
+  .chip.pref { background:#0f172a; color:#fff; }
+  .chip.contract { background:#e0e7ff; color:#3730a3; }
+  .chip.cat { background:#f1f5f9; color:#475569; font-weight:600; }
+
+  .bars { margin-top:12px; }
+  .bar-row { display:flex; align-items:center; gap:10px; margin:5px 0; font-size:.78rem; }
+  .bar-label { flex:0 0 78px; color:#64748b; }
+  .bar-track { flex:1; height:7px; background:#eef1f5; border-radius:5px; overflow:hidden; }
+  .bar-fill { height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }
+  .bar-val { flex:0 0 46px; text-align:right; color:#334155; font-variant-numeric:tabular-nums; }
+
+  .expl { margin-top:13px; background:#f8fafc; border-left:3px solid #2563eb; border-radius:8px;
+          padding:10px 14px; color:#334155; font-size:.9rem; line-height:1.5; }
+  .expl .ai { color:#94a3b8; font-size:.72rem; font-weight:600; margin-left:6px; }
+
+  /* similar-products rows */
+  .hit { display:flex; align-items:center; gap:14px; padding:10px 2px; border-bottom:1px solid #eef1f5; }
+  .hit-main { flex:1; min-width:0; }
+  .hit-name { font-weight:600; color:#0f172a; }
+  .hit-track { flex:0 0 150px; height:7px; background:#eef1f5; border-radius:5px; overflow:hidden; }
+  .hit-fill { height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }
+  .hit-score { flex:0 0 44px; text-align:right; font-weight:700; color:#334155; font-variant-numeric:tabular-nums; }
+
+  /* empty state */
+  .empty { text-align:center; color:#94a3b8; padding:46px 20px; border:1px dashed #d8dee7;
+           border-radius:14px; background:#fff; }
+  .empty .big { font-size:30px; margin-bottom:8px; }
+
+  /* sidebar status dots */
+  .stat { font-size:.9rem; margin:3px 0; color:#334155; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
+  .dot.on { background:#16a34a; } .dot.off { background:#cbd5e1; }
+</style>
+"""
+
+
+def chip(text: str, cls: str = "") -> str:
+    return f'<span class="chip {cls}">{text}</span>'
+
+
+def render_replacement(rep: dict, rank: int) -> str:
+    color = LABEL_COLORS.get(rep.get("confidence_label", ""), "#64748b")
+    price = rep.get("effective_price")
+    unit = rep.get("unit") or "unit"
+    sub = " · ".join(
+        p for p in [
+            rep.get("brand"),
+            f"{price:.2f}/{unit}" if isinstance(price, (int, float)) else None,
+            f"{int(rep['stock_quantity'])} in stock" if rep.get("stock_quantity") is not None else None,
+        ] if p
+    )
+    chips = chip(rep.get("category_id", ""), "cat") if rep.get("category_id") else ""
+    if rep.get("is_preferred"):
+        chips += chip("★ Preferred supplier", "pref")
+    elif rep.get("is_under_contract"):
+        chips += chip("Under contract", "contract")
+
+    b = rep["score_breakdown"]
+    bars = "".join(
+        f'<div class="bar-row"><span class="bar-label">{label}</span>'
+        f'<span class="bar-track"><span class="bar-fill" style="width:{round(b[key] / mx * 100)}%"></span></span>'
+        f'<span class="bar-val">{b[key]}/{mx}</span></div>'
+        for key, label, mx in DIMENSIONS
+    )
+    ai = '<span class="ai">✨ AI-generated</span>' if rep.get("explanation_source") == "ollama" else ""
+    return (
+        f'<div class="card">'
+        f'<div class="rep-head">'
+        f'<div class="rank">{rank}</div>'
+        f'<div class="rep-main"><div class="rep-name">{rep["name"]}</div>'
+        f'<div class="rep-sub">{sub}</div><div>{chips}</div></div>'
+        f'<div class="rep-right"><div class="conf" style="color:{color}">{rep["confidence_pct"]}%</div>'
+        f'<div class="conf-label" style="color:{color}">{rep.get("confidence_label", "")} match</div>'
+        f'<div class="fit">Fit score {rep["final_score"]}/93</div></div>'
+        f'</div>'
+        f'<div class="bars">{bars}</div>'
+        f'<div class="expl">{rep["explanation"]}{ai}</div>'
+        f'</div>'
+    )
+
+
+def render_hit(hit: dict) -> str:
+    pct = round(max(0.0, min(1.0, hit.get("score", 0))) * 100)
+    return (
+        f'<div class="hit">'
+        f'<div class="hit-main"><span class="hit-name">{hit["name"]}</span> {chip(hit.get("category_id", ""), "cat")}</div>'
+        f'<span class="hit-track"><span class="hit-fill" style="width:{pct}%"></span></span>'
+        f'<span class="hit-score">{hit.get("score", 0):.2f}</span>'
+        f'</div>'
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Page
 # --------------------------------------------------------------------------- #
 st.set_page_config(page_title="Smart Substitution Engine", page_icon="🔁", layout="wide")
-
-# Hide Streamlit's developer chrome (Deploy button, menu, footer, status widget)
-# so the app reads as a finished product rather than a dev tool.
-st.markdown(
-    """
-    <style>
-      [data-testid="stToolbar"] {visibility: hidden; height: 0; position: fixed;}
-      [data-testid="stDecoration"] {display: none;}
-      [data-testid="stStatusWidget"] {display: none;}
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(CSS, unsafe_allow_html=True)
 
 if "preset" not in st.session_state:
     st.session_state.preset = next(iter(PRESETS))
 
-st.title("🔁 Smart Substitution Engine")
-st.caption("AI-powered product replacement — instantly ranks the best available alternatives when an item is out of stock.")
+st.markdown(
+    '<div class="brand"><div class="logo">🔁</div>'
+    '<div><h1>Smart Substitution Engine</h1>'
+    '<div class="tag">AI-powered replacements for out-of-stock products</div></div></div>'
+    '<div class="rule"></div>',
+    unsafe_allow_html=True,
+)
 
-# ---- Sidebar: connection + health ----
+# ---- Sidebar ----
 with st.sidebar:
-    st.header("Status")
-    st.session_state.ai_url = st.text_input("Service URL", value=_base_url())
-    if st.button("Refresh", use_container_width=True):
-        st.session_state.pop("_health", None)
-    if "_health" not in st.session_state:
-        ok, data, err = api_get("/health")
-        st.session_state._health = (ok, data, err)
-    ok, health, err = st.session_state._health
+    st.markdown("### Status")
+    ok, health, err = api_get("/health") if "_health" not in st.session_state else st.session_state._health
+    st.session_state._health = (ok, health, err)
 
     if not ok:
-        st.error("● Service offline")
+        st.markdown('<div class="stat"><span class="dot off"></span>Service offline</div>', unsafe_allow_html=True)
     else:
         emb = health.get("embeddings", {})
         vs = health.get("vector_store", {})
         ai_ready = health.get("ollama", {}).get("reachable")
-        st.success("● Service online")
+        idx = vs.get("indexed_products", 0) if vs.get("available") else "—"
+        rows = [
+            ("on", "Service online"),
+            ("on" if ai_ready else "off", "AI explanations" + ("" if ai_ready else " · standard")),
+            ("on" if emb.get("available") else "off", "Semantic matching" + ("" if emb.get("available") else " · basic")),
+            ("on" if vs.get("available") else "off", f"Search index · {idx} products"),
+        ]
         st.markdown(
-            f"- **AI explanations**: {'🟢 Ready' if ai_ready else '⚪ Standard'}\n"
-            f"- **Semantic matching**: {'🟢 Ready' if emb.get('available') else '⚪ Basic'}\n"
-            f"- **Search index**: {vs.get('indexed_products', 0) if vs.get('available') else '—'} products"
+            "".join(f'<div class="stat"><span class="dot {d}"></span>{t}</div>' for d, t in rows),
+            unsafe_allow_html=True,
         )
-    st.divider()
-    st.caption("Smart Substitution Engine")
 
-tab_reco, tab_search = st.tabs(["🔁 Replacements", "🔍 Vector Search"])
+    if st.button("Refresh", use_container_width=True):
+        st.session_state.pop("_health", None)
+        st.rerun()
+
+    with st.expander("Advanced"):
+        st.session_state.ai_url = st.text_input("Service URL", value=_base_url())
+
+    st.markdown('<div style="color:#94a3b8;font-size:.78rem;margin-top:18px;">Smart Substitution Engine · demo</div>',
+                unsafe_allow_html=True)
+
+tab_reco, tab_search = st.tabs(["Replacements", "Similar products"])
 
 # =========================================================================== #
 # Tab 1 — Replacements
@@ -199,38 +331,46 @@ with tab_reco:
     preset_name = st.selectbox("Scenario", list(PRESETS), key="preset")
     preset = PRESETS[preset_name]
 
-    st.subheader("Out-of-stock product")
+    st.markdown('<div class="sec">Out-of-stock item</div>', unsafe_allow_html=True)
     rp = preset["requested"]
     c1, c2, c3, c4 = st.columns(4)
-    name = c1.text_input("Name", rp["name"], key=f"name_{preset_name}")
+    name = c1.text_input("Product", rp["name"], key=f"name_{preset_name}")
     category_id = c2.text_input("Category", rp["category_id"], key=f"cat_{preset_name}")
-    base_price = c3.number_input("Base price", value=float(rp["base_price"]), min_value=0.0, step=0.5, key=f"bp_{preset_name}")
+    base_price = c3.number_input("Price", value=float(rp["base_price"]), min_value=0.0, step=0.5, key=f"bp_{preset_name}")
     quantity = c4.number_input("Quantity needed", value=int(preset["quantity"]), min_value=1, step=1, key=f"qty_{preset_name}")
     c5, c6, c7 = st.columns(3)
     unit = c5.text_input("Unit", rp.get("unit") or "", key=f"unit_{preset_name}")
     pack_size = c6.number_input("Pack size", value=float(rp.get("pack_size") or 0), min_value=0.0, step=0.5, key=f"pack_{preset_name}")
-    dietary = c7.text_input("Dietary tags (comma-sep)", rp.get("dietary_tags", ""), key=f"diet_{preset_name}",
+    dietary = c7.text_input("Dietary tags", rp.get("dietary_tags", ""), key=f"diet_{preset_name}",
                             help="A replacement must carry ALL of these (allergen safety).")
 
-    st.subheader("Candidate products")
-    st.caption("Edit freely — add/remove rows. Rows with a contract price or 'preferred' feed the contract scoring.")
+    st.markdown('<div class="sec">Available products</div>', unsafe_allow_html=True)
     cand_df = pd.DataFrame(preset["candidates"], columns=CANDIDATE_COLUMNS)
     edited = st.data_editor(
-        cand_df, num_rows="dynamic", use_container_width=True, key=f"cand_{preset_name}",
+        cand_df, num_rows="dynamic", use_container_width=True, hide_index=True, key=f"cand_{preset_name}",
         column_config={
-            "base_price": st.column_config.NumberColumn(format="%.2f"),
-            "contract_price": st.column_config.NumberColumn(format="%.2f"),
-            "is_preferred": st.column_config.CheckboxColumn(),
-            "is_active": st.column_config.CheckboxColumn(),
+            "id": st.column_config.TextColumn("ID", width="small"),
+            "name": st.column_config.TextColumn("Product", width="medium"),
+            "category_id": st.column_config.TextColumn("Category", width="small"),
+            "brand": st.column_config.TextColumn("Brand", width="small"),
+            "unit": st.column_config.TextColumn("Unit", width="small"),
+            "pack_size": st.column_config.NumberColumn("Pack", format="%.1f", width="small"),
+            "base_price": st.column_config.NumberColumn("Price", format="%.2f", width="small"),
+            "stock_quantity": st.column_config.NumberColumn("Stock", format="%d", width="small"),
+            "contract_price": st.column_config.NumberColumn("Contract", format="%.2f", width="small"),
+            "is_preferred": st.column_config.CheckboxColumn("Preferred", width="small"),
+            "is_active": st.column_config.CheckboxColumn("Active", width="small"),
+            "dietary_tags": st.column_config.TextColumn("Dietary", width="small"),
         },
     )
 
-    o1, o2, _ = st.columns([1, 1, 2])
+    o1, o2, o3 = st.columns([1.2, 1.2, 1.6])
     max_results = o1.slider("Max results", 1, 10, 3)
-    use_ai = o2.toggle("AI explanations", value=True,
-                       help="Off = instant rule-based explanations.")
+    use_ai = o2.toggle("AI explanations", value=True, help="Off = instant rule-based explanations.")
+    o3.write("")
+    go = o3.button("Find replacements", type="primary", use_container_width=True)
 
-    if st.button("🔎 Find replacements", type="primary", use_container_width=True):
+    if go:
         candidates, contract_items = [], []
         for _, row in edited.iterrows():
             if not str(row.get("id") or "").strip():
@@ -267,84 +407,77 @@ with tab_reco:
             "max_results": max_results,
             "use_ai_explanation": use_ai,
         }
-
-        with st.spinner("Scoring candidates…"):
+        with st.spinner("Finding the best alternatives…"):
             ok, data, err = api_post("/recommendations/replacements", payload)
-        if not ok:
-            st.error(f"Request failed: {err}")
-        else:
-            reps = data.get("replacements", [])
-            if not reps:
-                st.warning(data.get("no_candidates_reason") or "No suitable replacement found.")
-            for i, rep in enumerate(reps, 1):
-                with st.container(border=True):
-                    head, score = st.columns([4, 1])
-                    color = LABEL_COLORS.get(rep["confidence_label"], "#666")
-                    chips = ""
-                    if rep.get("is_preferred"):
-                        chips += " &nbsp;<span style='background:#1e293b;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em'>preferred</span>"
-                    elif rep.get("is_under_contract"):
-                        chips += " &nbsp;<span style='background:#334155;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em'>under contract</span>"
-                    head.markdown(
-                        f"#### {i}. {rep['name']}  \n"
-                        f"<span style='background:{color};color:#fff;padding:2px 10px;border-radius:10px'>"
-                        f"{rep['confidence_label']} · {rep['confidence_pct']}%</span>{chips}",
+        st.session_state.reco = {"ok": ok, "data": data, "err": err}
+
+    st.markdown('<div class="sec">Recommended replacements</div>', unsafe_allow_html=True)
+    reco = st.session_state.get("reco")
+    if not reco:
+        st.markdown('<div class="empty"><div class="big">🛒</div>Choose a scenario and select '
+                    '<b>Find replacements</b> to see ranked alternatives.</div>', unsafe_allow_html=True)
+    elif not reco["ok"]:
+        st.error(f"Could not get recommendations. {reco['err'] or ''}")
+    else:
+        data = reco["data"]
+        reps = data.get("replacements", [])
+        if not reps:
+            st.markdown(f'<div class="empty"><div class="big">🔍</div>'
+                        f'{data.get("no_candidates_reason") or "No suitable replacement found."}</div>',
+                        unsafe_allow_html=True)
+        for i, rep in enumerate(reps, 1):
+            st.markdown(render_replacement(rep, i), unsafe_allow_html=True)
+
+        rejected = data.get("rejected_candidates", [])
+        if rejected:
+            with st.expander(f"Not recommended ({len(rejected)})"):
+                for rc in rejected:
+                    st.markdown(
+                        f'**{rc["name"]}** — <span style="color:#b91c1c">{rc["rejection_reason"]}</span>',
                         unsafe_allow_html=True,
                     )
-                    score.metric("Score", f"{rep['final_score']}/93")
-                    b = rep["score_breakdown"]
-                    cols = st.columns(len(DIMENSIONS))
-                    for col, (key, label, mx) in zip(cols, DIMENSIONS):
-                        val = b[key]
-                        col.progress(int(val / mx * 100), text=f"{label} {val}/{mx}")
-                    tag = (
-                        "<small style='opacity:0.55'>✨ AI-generated</small>"
-                        if rep.get("explanation_source") == "ollama"
-                        else ""
-                    )
-                    st.markdown(f"💬 *{rep['explanation']}* &nbsp; {tag}", unsafe_allow_html=True)
-
-            rejected = data.get("rejected_candidates", [])
-            if rejected:
-                with st.expander(f"🚫 Rejected candidates ({len(rejected)})"):
-                    st.dataframe(pd.DataFrame(rejected), use_container_width=True, hide_index=True)
 
 # =========================================================================== #
 # Tab 2 — Similar products
 # =========================================================================== #
 with tab_search:
-    st.subheader("Find similar products")
+    st.markdown('<div class="sec">Find similar products</div>', unsafe_allow_html=True)
     st.caption("Search the catalog by meaning, not just keywords — great for discovering substitutes.")
 
     if st.button("📥 Load sample catalog", use_container_width=True):
-        with st.spinner("Loading…"):
+        with st.spinner("Loading catalog…"):
             ok, data, err = api_post("/index/products", {"products": SAMPLE_CATALOG})
         if ok:
-            st.success(f"Loaded {data['indexed']} products into the search index.")
             st.session_state.pop("_health", None)
+            st.success(f"Loaded {data['indexed']} products into the search index.")
         else:
             st.error("Couldn't load the catalog — the search service is unavailable.")
 
-    st.divider()
     q1, q2, q3 = st.columns([3, 2, 1])
-    query = q1.text_input("Find products similar to…", "Chicken Breast 2kg")
-    query_cat = q2.text_input("Restrict to category (optional)", "")
-    top_k = q3.number_input("Top K", value=5, min_value=1, max_value=20)
-    active_only = st.toggle("Active products only", value=True)
+    query = q1.text_input("Search for", "Chicken Breast 2kg")
+    query_cat = q2.text_input("Category (optional)", "")
+    top_k = q3.number_input("Results", value=5, min_value=1, max_value=20)
+    active_only = st.toggle("In-stock products only", value=True)
 
-    if st.button("🔍 Search", type="primary", use_container_width=True):
+    if st.button("Search", type="primary", use_container_width=True):
         payload = {"name": query, "top_k": int(top_k), "active_only": active_only}
         if query_cat.strip():
             payload["category_id"] = query_cat.strip()
         with st.spinner("Searching…"):
             ok, data, err = api_post("/search/similar", payload)
-        if not ok:
-            st.error("Search is unavailable — load the sample catalog first.")
+        st.session_state.search = {"ok": ok, "data": data, "err": err}
+
+    search = st.session_state.get("search")
+    if not search:
+        st.markdown('<div class="empty"><div class="big">🔎</div>Load the sample catalog, then search '
+                    'for a product to see the closest matches.</div>', unsafe_allow_html=True)
+    elif not search["ok"]:
+        st.error("Search is unavailable — load the sample catalog first.")
+    else:
+        hits = search["data"].get("results", [])
+        if not hits:
+            st.markdown('<div class="empty"><div class="big">🤷</div>No matches found — '
+                        'load the sample catalog first.</div>', unsafe_allow_html=True)
         else:
-            hits = data.get("results", [])
-            if not hits:
-                st.info("No matches found — load the sample catalog first.")
-            for h in hits:
-                c1, c2 = st.columns([4, 1])
-                c1.progress(h["score"], text=f"{h['name']}  ·  [{h['category_id']}]")
-                c2.markdown(f"**{h['score']:.3f}**")
+            st.markdown('<div class="card">' + "".join(render_hit(h) for h in hits) + '</div>',
+                        unsafe_allow_html=True)
