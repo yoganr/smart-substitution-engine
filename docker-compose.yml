@@ -91,6 +91,26 @@ services:
       - milvus
     restart: unless-stopped
 
+  # ---------------- MongoDB (catalog database) ----------------
+  mongo:
+    image: mongo:7
+    container_name: sse-mongo
+    # No auth for local dev: connect with mongodb://localhost:27017 from the host
+    # or mongodb://mongo:27017 from inside this compose network. To use Atlas
+    # instead, point SSE_MONGO_URI at your mongodb+srv://... string (this service
+    # can simply stay stopped).
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
   # ---------------- Ollama (text generation) ----------------
   ollama:
     image: ollama/ollama:latest
@@ -129,6 +149,8 @@ services:
         condition: service_healthy
       milvus:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     environment:
       - SSE_OLLAMA_BASE_URL=http://ollama:11434
       - SSE_CHAT_MODEL=qwen3.5:0.8b
@@ -138,6 +160,9 @@ services:
       - SSE_ENABLE_MILVUS=true
       - SSE_MILVUS_URI=http://milvus:19530
       - SSE_MILVUS_COLLECTION=product_embeddings
+      - SSE_ENABLE_MONGO=true
+      - SSE_MONGO_URI=mongodb://mongo:27017
+      - SSE_MONGO_DB=hackathon_db
       - HF_HOME=/cache/huggingface
     volumes:
       - hf-cache:/cache/huggingface
@@ -174,6 +199,7 @@ volumes:
   etcd-data:
   minio-data:
   milvus-data:
+  mongo-data:
   ollama-models:
   hf-cache:
 

@@ -77,10 +77,10 @@ from typing import Any, Optional
 # ---------------------------------------------------------------------------
 # Defaults (mirror ai-service/app/config.py and backend appsettings.json)
 # ---------------------------------------------------------------------------
-# Credentials are NOT stored here. The Atlas URI lives in ai-service/.env
-# (SSE_MONGO_URI) — gitignored — which this script auto-loads. Override per run
-# with --mongo-uri or the MONGODB_URI / SSE_MONGO_URI environment variable.
-DEFAULT_MONGO_URI = ""
+# Defaults to the LOCAL Docker MongoDB. The Atlas URI (when used) lives in
+# ai-service/.env (SSE_MONGO_URI) — gitignored — which this script auto-loads.
+# Override per run with --mongo-uri or the MONGODB_URI / SSE_MONGO_URI env var.
+DEFAULT_MONGO_URI = "mongodb://localhost:27017"
 DEFAULT_DB = "hackathon_db"
 DEFAULT_MILVUS_URI = "http://localhost:19530"
 DEFAULT_MILVUS_TOKEN = ""
