@@ -4,7 +4,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    AI_SERVICE_URL=http://ai-service:8000
+    AI_SERVICE_URL=http://ai-service:8080
 
 WORKDIR /app
 

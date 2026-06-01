@@ -1,9 +1,9 @@
 """FastAPI entry point for the Smart Substitution Engine AI service.
 
 Run locally:
-    uvicorn app.main:app --reload --port 8000
+    uvicorn app.main:app --reload --port 8080
 
-Then open http://localhost:8000/docs for interactive Swagger docs.
+Then open http://localhost:8080/docs for interactive Swagger docs.
 """
 
 from __future__ import annotations
@@ -17,13 +17,19 @@ from app import __version__
 from app.config import get_settings
 from app.engine import build_engine
 from app.logging_config import configure_logging, get_logger
+from app.mongo import build_mongo_repo
 from app.providers import probe_ollama
 from app.schemas import (
+    AutoReplacementRequest,
+    CandidateProduct,
+    Company,
+    ContractItem,
     HealthResponse,
     IndexProductsRequest,
     IndexProductsResponse,
     ReplacementRequest,
     ReplacementResponse,
+    RequestedProduct,
     SearchSimilarRequest,
     SearchSimilarResponse,
 )
@@ -59,9 +65,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
     app.state.engine = build_engine(settings)
+    app.state.mongo_repo = build_mongo_repo(settings)
     engine = app.state.engine
     logger.info(
-        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s, milvus=%s)",
+        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s, milvus=%s, atlas=%s)",
         settings.service_name,
         __version__,
         settings.chat_model,
@@ -70,6 +77,7 @@ async def lifespan(app: FastAPI):
         engine.similarity.embedding_device or "n/a",
         settings.enable_llm_explanations,
         "up" if engine.similarity.uses_milvus else "off",
+        "on" if app.state.mongo_repo else "off",
     )
     yield
     logger.info("Shutting down %s.", settings.service_name)
@@ -120,12 +128,20 @@ async def health(http_request: Request) -> HealthResponse:
         "collection": settings.milvus_collection,
         "indexed_products": engine.retrieval.count() if available else 0,
     }
+    repo = getattr(http_request.app.state, "mongo_repo", None)
+    mongo = {
+        "enabled": settings.enable_mongo,
+        "configured": bool(settings.mongo_uri),
+        "database": settings.mongo_db,
+        "available": (await repo.ping()) if repo else False,
+    }
     return HealthResponse(
         service=settings.service_name,
         version=__version__,
         ollama=ollama,
         embeddings=embeddings,
         vector_store=vector_store,
+        mongo=mongo,
     )
 
 
@@ -192,3 +208,71 @@ async def recommend_replacements(
 ) -> ReplacementResponse:
     engine = http_request.app.state.engine
     return await engine.recommend(request)
+
+
+@app.post(
+    "/recommendations/auto",
+    response_model=ReplacementResponse,
+    tags=["recommendations"],
+    summary="Rank replacements, fetching the catalog directly from MongoDB Atlas",
+    response_description="Ranked replacements; all inputs are read from Atlas by company_id + product_id.",
+)
+async def recommend_auto(
+    request: AutoReplacementRequest, http_request: Request
+) -> ReplacementResponse:
+    """Self-service variant of /recommendations/replacements.
+
+    Mirrors the .NET RecommendationController flow but sources data from Atlas
+    instead of the request body: load company + product, short-circuit if the
+    product is still in stock, then assemble contract items and same-category
+    in-stock candidates and hand them to the engine.
+    """
+    repo = getattr(http_request.app.state, "mongo_repo", None)
+    if repo is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Direct Atlas access is not configured (set SSE_MONGO_URI in .env).",
+        )
+    engine = http_request.app.state.engine
+
+    try:
+        company = await repo.get_company(request.company_id)
+        if company is None:
+            raise HTTPException(404, detail=f"Company '{request.company_id}' not found")
+
+        product = await repo.get_product(request.product_id)
+        if product is None:
+            raise HTTPException(404, detail=f"Product '{request.product_id}' not found")
+
+        # Still in stock? Then no replacement is needed (mirrors the .NET check).
+        stock = await repo.get_stock(request.product_id)
+        if stock is not None and stock >= request.requested_quantity:
+            return ReplacementResponse(
+                replacement_needed=False,
+                requested_product_id=request.product_id,
+                no_candidates_reason="Requested product is in stock.",
+            )
+
+        contract_items = await repo.get_contract_items(request.company_id)
+        contract_price = {c["product_id"]: c.get("contract_price") for c in contract_items}
+
+        raw_candidates = await repo.get_candidates(product["category_id"], request.product_id)
+        candidates = [
+            CandidateProduct(**{**c, "contract_price": contract_price.get(c["id"])})
+            for c in raw_candidates
+        ]
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - live Atlas failure path
+        raise HTTPException(status_code=502, detail=f"Atlas query failed: {exc}") from exc
+
+    rec_request = ReplacementRequest(
+        company=Company(**company),
+        requested_product=RequestedProduct(**product),
+        requested_quantity=request.requested_quantity,
+        contract_items=[ContractItem(**c) for c in contract_items],
+        candidate_products=candidates,
+        max_results=request.max_results,
+        use_ai_explanation=request.use_ai_explanation,
+    )
+    return await engine.recommend(rec_request)

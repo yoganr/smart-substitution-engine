@@ -11,6 +11,7 @@ def client(monkeypatch):
     monkeypatch.setenv("SSE_ENABLE_EMBEDDINGS", "false")
     monkeypatch.setenv("SSE_ENABLE_LLM_EXPLANATIONS", "false")
     monkeypatch.setenv("SSE_ENABLE_MILVUS", "false")
+    monkeypatch.setenv("SSE_ENABLE_MONGO", "false")
     from app.config import get_settings
 
     get_settings.cache_clear()
@@ -105,6 +106,7 @@ def test_recommend_validation_error(client):
 def test_openapi_schema_exposes_endpoints(client):
     spec = client.get("/openapi.json").json()
     assert "/recommendations/replacements" in spec["paths"]
+    assert "/recommendations/auto" in spec["paths"]
     assert "/health" in spec["paths"]
     assert "/index/products" in spec["paths"]
     assert "/search/similar" in spec["paths"]
@@ -115,6 +117,14 @@ def test_health_reports_vector_store(client):
     assert body["vector_store"]["backend"] == "milvus"
     # Milvus disabled in tests -> reported unavailable, not crashing.
     assert body["vector_store"]["available"] is False
+
+
+def test_auto_503_when_mongo_disabled(client):
+    # Mongo is disabled in the test fixture -> the direct-Atlas endpoint degrades with 503.
+    resp = client.post("/recommendations/auto", json={
+        "company_id": "company_001", "product_id": "product_001", "requested_quantity": 20,
+    })
+    assert resp.status_code == 503
 
 
 def test_vector_endpoints_503_when_milvus_disabled(client):

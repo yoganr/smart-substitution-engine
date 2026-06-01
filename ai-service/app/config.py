@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     milvus_collection: str = "product_embeddings"
     embedding_dim: int = 1024  # bge-m3 output dimension
 
+    # --- MongoDB Atlas (direct catalog access) ---
+    # When a mongo_uri is set, the service reads products/companies/contracts/
+    # inventory straight from Atlas to power POST /recommendations/auto, instead
+    # of relying on the .NET backend to pass candidate_products. An empty uri
+    # leaves that endpoint reporting 503; the rest of the service is unaffected.
+    enable_mongo: bool = True
+    mongo_uri: str = ""  # mongodb+srv://...  (keep real creds in .env, never in code)
+    mongo_db: str = "hackathon_db"
+
     # --- Feature toggles ---
     enable_embeddings: bool = True
     enable_llm_explanations: bool = True

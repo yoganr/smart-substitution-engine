@@ -1,6 +1,6 @@
 """Smart Substitution Engine — demo UI (Streamlit).
 
-Talks directly to the AI service (default http://localhost:8000) so it is fully
+Talks directly to the AI service (default http://localhost:8080) so it is fully
 self-contained — no database or .NET backend needed for the demo.
 
 Run locally:
@@ -17,7 +17,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8000").rstrip("/")
+AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8080").rstrip("/")
 TIMEOUT = 90  # explanations can take a few seconds
 
 LABEL_COLORS = {

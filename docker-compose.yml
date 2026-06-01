@@ -11,7 +11,7 @@
 #   ui                     - Streamlit demo UI       -> http://localhost:8501
 #
 # The .NET backend (other engineer) is NOT included here — it calls this service
-# at http://localhost:8000 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
+# at http://localhost:8080 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
 # first start downloads models + images.
 # =============================================================================
 # docker compose up --build -d
@@ -142,13 +142,13 @@ services:
     volumes:
       - hf-cache:/cache/huggingface
     ports:
-      - "8000:8000"
+      - "8080:8080"
     healthcheck:
       test:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health',timeout=3).status==200 else 1)"
       interval: 15s
       timeout: 5s
       retries: 20
@@ -165,7 +165,7 @@ services:
       ai-service:
         condition: service_healthy
     environment:
-      - AI_SERVICE_URL=http://ai-service:8000
+      - AI_SERVICE_URL=http://ai-service:8080
     ports:
       - "8501:8501"
     restart: unless-stopped

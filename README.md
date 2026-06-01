@@ -14,7 +14,7 @@ This is a monorepo with three parts:
 | [`ui/`](ui/) | Python AI Engineer | Streamlit demo UI (→ AI service) |
 | [`backend/`](backend/) | .NET Engineer | ASP.NET Core · MongoDB Atlas |
 
-The .NET backend calls the Python AI service at `http://localhost:8000` — see
+The .NET backend calls the Python AI service at `http://localhost:8080` — see
 [`INTEGRATION.md`](INTEGRATION.md) for the contract and [`HACKATHON.md`](HACKATHON.md)
 for the full plan. This README documents the **Python AI service** (`ai-service/`).
 
@@ -28,7 +28,7 @@ flowchart TB
     NET["🟦 .NET Backend<br/>(CRUD, logs)"]
     DB[("🍃 MongoDB Atlas")]
 
-    subgraph AI["⚙️ Python AI Service · FastAPI + LangGraph · :8000"]
+    subgraph AI["⚙️ Python AI Service · FastAPI + LangGraph · :8080"]
         SCORE["Deterministic scoring<br/>+ ranking (max 93)"]
         EMB["bge-m3 embeddings<br/>sentence-transformers · in-process"]
     end
@@ -107,7 +107,7 @@ docker compose up --build
 
 Brings up the whole stack, auto-pulls `qwen3.5:0.8b`, and serves:
 - **Demo UI** → <http://localhost:8501>
-- AI service / Swagger → <http://localhost:8000/docs>
+- AI service / Swagger → <http://localhost:8080/docs>
 - Milvus UI (Attu) → <http://localhost:8002>
 
 See [`DOCKER.md`](DOCKER.md) for details. First run downloads the models
@@ -128,17 +128,17 @@ ollama serve
 ollama pull qwen3.5:0.8b
 
 # 3. Run the service
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8080
 #    or: ./run.ps1
 ```
 
-- Swagger UI: <http://localhost:8000/docs>
-- Health check: <http://localhost:8000/health>
+- Swagger UI: <http://localhost:8080/docs>
+- Health check: <http://localhost:8080/health>
 
 Try it:
 
 ```powershell
-curl -X POST http://localhost:8000/recommendations/replacements `
+curl -X POST http://localhost:8080/recommendations/replacements `
   -H "Content-Type: application/json" -d "@examples/sample_request.json"
 ```
 
@@ -158,7 +158,7 @@ AI service (no MongoDB needed) and has two tabs:
 ```powershell
 # With Docker: included in `docker compose up`  ->  http://localhost:8501
 
-# Or locally (AI service must be running on :8000):
+# Or locally (AI service must be running on :8080):
 cd ui
 python -m pip install -r requirements.txt
 streamlit run app.py            # opens http://localhost:8501
@@ -204,7 +204,7 @@ docker compose -f ai-service/milvus-standalone-docker-compose.yml up -d
 cd ai-service && python examples/seed_milvus.py
 
 # 3. Search the catalog by vector similarity
-curl -X POST http://localhost:8000/search/similar `
+curl -X POST http://localhost:8080/search/similar `
   -H "Content-Type: application/json" `
   -d '{"name": "Chicken Breast 2kg", "top_k": 5}'
 ```

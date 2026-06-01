@@ -108,6 +108,30 @@ class ReplacementRequest(BaseModel):
     use_ai_explanation: bool = Field(default=True)
 
 
+class AutoReplacementRequest(BaseModel):
+    """Minimal request for the direct-Atlas path (POST /recommendations/auto):
+    the service fetches the product, company, contract, inventory and candidates
+    from MongoDB itself, so the caller only supplies identifiers."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "company_id": "company_001",
+                "product_id": "product_001",
+                "requested_quantity": 20,
+                "max_results": 3,
+                "use_ai_explanation": True,
+            }
+        }
+    )
+
+    company_id: str = Field(..., examples=["company_001"])
+    product_id: str = Field(..., examples=["product_001"])
+    requested_quantity: float = Field(..., gt=0, examples=[20])
+    max_results: int = Field(default=3, ge=1, le=50, examples=[3])
+    use_ai_explanation: bool = Field(default=True)
+
+
 # ---------------------------------------------------------------------------
 # Response models (Python -> .NET)
 # ---------------------------------------------------------------------------
@@ -180,6 +204,7 @@ class HealthResponse(BaseModel):
     ollama: dict
     embeddings: dict
     vector_store: dict
+    mongo: dict = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
