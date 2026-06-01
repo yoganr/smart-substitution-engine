@@ -1,6 +1,6 @@
 """Smart Substitution Engine — demo UI (Streamlit).
 
-Talks directly to the AI service (default http://localhost:8080) so it is fully
+Talks directly to the AI service (default http://localhost:8000) so it is fully
 self-contained — no database or .NET backend needed for the demo.
 
 Run locally:
@@ -17,7 +17,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8080").rstrip("/")
+AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8000").rstrip("/")
 TIMEOUT = 90  # explanations can take a few seconds
 
 LABEL_COLORS = {
@@ -141,76 +141,132 @@ def _split_tags(value) -> list[str]:
 # --------------------------------------------------------------------------- #
 # Styling
 # --------------------------------------------------------------------------- #
-CSS = """
-<style>
-  /* hide developer chrome */
-  [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
-  #MainMenu, footer { visibility:hidden; }
+def build_css(dark: bool) -> str:
+    """Return the full <style> block for the chosen theme.
 
-  .stApp { background:#f6f7f9; }
-  .block-container { padding-top:1.4rem; padding-bottom:4rem; max-width:1180px; }
+    Every colour is driven by a CSS variable, so flipping ``dark`` re-themes the
+    whole app in one shot — the custom cards AND the native Streamlit shell
+    (sidebar, inputs, selects, tabs, expanders, secondary buttons).
+    """
+    if dark:
+        v = {
+            "bg": "#0b1220", "surface": "#141d2e", "border": "#25324a", "inputbg": "#0f1828",
+            "text": "#e9eef7", "muted": "#9fb0c9", "faint": "#6f8099", "body": "#c7d2e0",
+            "track": "#1f2a3e", "rankbg": "#1e2a47", "ranktext": "#a5b4fc", "expl": "#111c30",
+            "chipbg": "#1f2a3e", "chiptext": "#cbd5e1", "empty": "#141d2e", "eborder": "#2c3a54",
+            "shadow": "0 1px 3px rgba(0,0,0,.35)", "rule_end": "#25324a", "dot_off": "#475569",
+        }
+    else:
+        v = {
+            "bg": "#f6f7f9", "surface": "#ffffff", "border": "#e8ebf0", "inputbg": "#ffffff",
+            "text": "#0f172a", "muted": "#64748b", "faint": "#94a3b8", "body": "#334155",
+            "track": "#eef1f5", "rankbg": "#eef2ff", "ranktext": "#4338ca", "expl": "#f8fafc",
+            "chipbg": "#f1f5f9", "chiptext": "#475569", "empty": "#ffffff", "eborder": "#d8dee7",
+            "shadow": "0 1px 3px rgba(15,23,42,.04)", "rule_end": "#e2e8f0", "dot_off": "#cbd5e1",
+        }
+    return f"""
+<style>
+  :root {{
+    --bg:{v['bg']}; --surface:{v['surface']}; --border:{v['border']}; --inputbg:{v['inputbg']};
+    --text:{v['text']}; --muted:{v['muted']}; --faint:{v['faint']}; --body:{v['body']};
+    --track:{v['track']}; --rankbg:{v['rankbg']}; --ranktext:{v['ranktext']}; --expl:{v['expl']};
+    --chipbg:{v['chipbg']}; --chiptext:{v['chiptext']}; --empty:{v['empty']}; --eborder:{v['eborder']};
+    --shadow:{v['shadow']}; --rule-end:{v['rule_end']}; --dot-off:{v['dot_off']};
+  }}
+
+  /* hide developer chrome */
+  [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] {{ display:none !important; }}
+  #MainMenu, footer {{ visibility:hidden; }}
+
+  /* app shell + native surfaces follow the theme */
+  .stApp {{ background:var(--bg); color:var(--text);
+            --background-color:var(--bg); --secondary-background-color:var(--surface); --text-color:var(--text); }}
+  .block-container {{ padding-top:1.4rem; padding-bottom:4rem; max-width:1180px; }}
+  [data-testid="stSidebar"] {{ background:var(--surface); border-right:1px solid var(--border); }}
+  [data-testid="stSidebar"] *, .stApp p, .stApp label, .stApp li,
+  [data-testid="stWidgetLabel"] p, [data-baseweb="tab"] {{ color:var(--text); }}
+  .stApp [data-testid="stCaptionContainer"] {{ color:var(--muted) !important; }}
+
+  /* inputs / selects / number steppers */
+  .stApp [data-baseweb="input"], .stApp [data-baseweb="textarea"],
+  .stApp [data-baseweb="select"] > div, .stApp [data-baseweb="base-input"] {{
+      background:var(--inputbg) !important; border-color:var(--border) !important; }}
+  .stApp input, .stApp textarea, .stApp [data-baseweb="select"] div {{ color:var(--text) !important; }}
+  .stApp [data-testid="stNumberInput"] button {{ background:var(--inputbg) !important; border-color:var(--border) !important; color:var(--text) !important; }}
+
+  /* secondary buttons (the primary "Find/Search" button keeps its blue accent) */
+  .stApp button[kind="secondary"], .stApp [data-testid="baseButton-secondary"],
+  .stApp [data-testid="stBaseButton-secondary"] {{
+      background:var(--inputbg) !important; color:var(--text) !important; border-color:var(--border) !important; }}
+
+  /* tabs + expander + dataframe container */
+  .stApp [data-baseweb="tab-list"] {{ border-bottom:1px solid var(--border); background:transparent; }}
+  .stApp [data-baseweb="tab"][aria-selected="true"] {{ color:var(--text); }}
+  .stApp [data-testid="stExpander"] {{ background:var(--surface); border:1px solid var(--border); border-radius:12px; }}
+  .stApp [data-testid="stExpander"] summary {{ color:var(--text); }}
+  .stApp [data-testid="stDataFrame"], .stApp [data-testid="stDataEditor"] {{ border:1px solid var(--border); border-radius:10px; }}
 
   /* brand header */
-  .brand { display:flex; align-items:center; gap:14px; margin-bottom:2px; }
-  .brand .logo { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#4f46e5,#2563eb);
-                 display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 12px rgba(37,99,235,.25); }
-  .brand h1 { font-size:1.55rem; font-weight:800; letter-spacing:-.02em; margin:0; color:#0f172a; }
-  .brand .tag { color:#64748b; font-size:.9rem; margin-top:1px; }
-  .rule { height:1px; background:linear-gradient(90deg,#e2e8f0,transparent); margin:14px 0 4px; }
+  .brand {{ display:flex; align-items:center; gap:14px; margin-bottom:2px; }}
+  .brand .logo {{ width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#4f46e5,#2563eb);
+                 display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 12px rgba(37,99,235,.25); }}
+  .brand h1 {{ font-size:1.55rem; font-weight:800; letter-spacing:-.02em; margin:0; color:var(--text); }}
+  .brand .tag {{ color:var(--muted); font-size:.9rem; margin-top:1px; }}
+  .rule {{ height:1px; background:linear-gradient(90deg,var(--rule-end),transparent); margin:14px 0 4px; }}
 
   /* section labels */
-  .sec { text-transform:uppercase; letter-spacing:.07em; font-size:.72rem; font-weight:700; color:#94a3b8; margin:6px 0 2px; }
+  .sec {{ text-transform:uppercase; letter-spacing:.07em; font-size:.72rem; font-weight:700; color:var(--faint); margin:6px 0 2px; }}
 
   /* generic card */
-  .card { background:#fff; border:1px solid #e8ebf0; border-radius:14px; padding:16px 18px;
-          box-shadow:0 1px 3px rgba(15,23,42,.04); margin-bottom:14px; }
+  .card {{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px;
+          box-shadow:var(--shadow); margin-bottom:14px; }}
 
   /* result card */
-  .rep-head { display:flex; align-items:flex-start; gap:14px; }
-  .rank { flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:#eef2ff; color:#4338ca;
-          font-weight:800; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }
-  .rep-main { flex:1; min-width:0; }
-  .rep-name { font-weight:700; font-size:1.06rem; color:#0f172a; }
-  .rep-sub { color:#64748b; font-size:.82rem; margin:2px 0 7px; }
-  .rep-right { text-align:right; flex:0 0 auto; min-width:118px; }
-  .conf { font-size:1.6rem; font-weight:800; line-height:1; }
-  .conf-label { font-size:.74rem; font-weight:700; margin-top:1px; }
-  .fit { font-size:.72rem; color:#94a3b8; margin-top:3px; }
+  .rep-head {{ display:flex; align-items:flex-start; gap:14px; }}
+  .rank {{ flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:var(--rankbg); color:var(--ranktext);
+          font-weight:800; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }}
+  .rep-main {{ flex:1; min-width:0; }}
+  .rep-name {{ font-weight:700; font-size:1.06rem; color:var(--text); }}
+  .rep-sub {{ color:var(--muted); font-size:.82rem; margin:2px 0 7px; }}
+  .rep-right {{ text-align:right; flex:0 0 auto; min-width:118px; }}
+  .conf {{ font-size:1.6rem; font-weight:800; line-height:1; }}
+  .conf-label {{ font-size:.74rem; font-weight:700; margin-top:1px; }}
+  .fit {{ font-size:.72rem; color:var(--faint); margin-top:3px; }}
 
-  .chip { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.7rem; font-weight:700;
-          background:#f1f5f9; color:#475569; margin-right:6px; }
-  .chip.pref { background:#0f172a; color:#fff; }
-  .chip.contract { background:#e0e7ff; color:#3730a3; }
-  .chip.cat { background:#f1f5f9; color:#475569; font-weight:600; }
+  .chip {{ display:inline-block; padding:2px 10px; border-radius:999px; font-size:.7rem; font-weight:700;
+          background:var(--chipbg); color:var(--chiptext); margin-right:6px; }}
+  .chip.pref {{ background:#4338ca; color:#fff; }}
+  .chip.contract {{ background:#3730a3; color:#e0e7ff; }}
+  .chip.cat {{ background:var(--chipbg); color:var(--chiptext); font-weight:600; }}
 
-  .bars { margin-top:12px; }
-  .bar-row { display:flex; align-items:center; gap:10px; margin:5px 0; font-size:.78rem; }
-  .bar-label { flex:0 0 78px; color:#64748b; }
-  .bar-track { flex:1; height:7px; background:#eef1f5; border-radius:5px; overflow:hidden; }
-  .bar-fill { height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }
-  .bar-val { flex:0 0 46px; text-align:right; color:#334155; font-variant-numeric:tabular-nums; }
+  .bars {{ margin-top:12px; }}
+  .bar-row {{ display:flex; align-items:center; gap:10px; margin:5px 0; font-size:.78rem; }}
+  .bar-label {{ flex:0 0 78px; color:var(--muted); }}
+  .bar-track {{ flex:1; height:7px; background:var(--track); border-radius:5px; overflow:hidden; }}
+  .bar-fill {{ height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
+  .bar-val {{ flex:0 0 46px; text-align:right; color:var(--body); font-variant-numeric:tabular-nums; }}
 
-  .expl { margin-top:13px; background:#f8fafc; border-left:3px solid #2563eb; border-radius:8px;
-          padding:10px 14px; color:#334155; font-size:.9rem; line-height:1.5; }
-  .expl .ai { color:#94a3b8; font-size:.72rem; font-weight:600; margin-left:6px; }
+  .expl {{ margin-top:13px; background:var(--expl); border-left:3px solid #2563eb; border-radius:8px;
+          padding:10px 14px; color:var(--body); font-size:.9rem; line-height:1.5; }}
+  .expl .ai {{ color:var(--faint); font-size:.72rem; font-weight:600; margin-left:6px; }}
 
   /* similar-products rows */
-  .hit { display:flex; align-items:center; gap:14px; padding:10px 2px; border-bottom:1px solid #eef1f5; }
-  .hit-main { flex:1; min-width:0; }
-  .hit-name { font-weight:600; color:#0f172a; }
-  .hit-track { flex:0 0 150px; height:7px; background:#eef1f5; border-radius:5px; overflow:hidden; }
-  .hit-fill { height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }
-  .hit-score { flex:0 0 44px; text-align:right; font-weight:700; color:#334155; font-variant-numeric:tabular-nums; }
+  .hit {{ display:flex; align-items:center; gap:14px; padding:10px 2px; border-bottom:1px solid var(--border); }}
+  .hit-main {{ flex:1; min-width:0; }}
+  .hit-name {{ font-weight:600; color:var(--text); }}
+  .hit-track {{ flex:0 0 150px; height:7px; background:var(--track); border-radius:5px; overflow:hidden; }}
+  .hit-fill {{ height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
+  .hit-score {{ flex:0 0 44px; text-align:right; font-weight:700; color:var(--body); font-variant-numeric:tabular-nums; }}
 
   /* empty state */
-  .empty { text-align:center; color:#94a3b8; padding:46px 20px; border:1px dashed #d8dee7;
-           border-radius:14px; background:#fff; }
-  .empty .big { font-size:30px; margin-bottom:8px; }
+  .empty {{ text-align:center; color:var(--faint); padding:46px 20px; border:1px dashed var(--eborder);
+           border-radius:14px; background:var(--empty); }}
+  .empty .big {{ font-size:30px; margin-bottom:8px; }}
 
   /* sidebar status dots */
-  .stat { font-size:.9rem; margin:3px 0; color:#334155; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
-  .dot.on { background:#16a34a; } .dot.off { background:#cbd5e1; }
+  .stat {{ font-size:.9rem; margin:3px 0; color:var(--text); }}
+  .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }}
+  .dot.on {{ background:#16a34a; }} .dot.off {{ background:var(--dot-off); }}
 </style>
 """
 
@@ -275,7 +331,8 @@ def render_hit(hit: dict) -> str:
 # Page
 # --------------------------------------------------------------------------- #
 st.set_page_config(page_title="Smart Substitution Engine", page_icon="🔁", layout="wide")
-st.markdown(CSS, unsafe_allow_html=True)
+# Theme is driven by the sidebar toggle (read here so the whole app re-themes on flip).
+st.markdown(build_css(st.session_state.get("dark_mode", False)), unsafe_allow_html=True)
 
 if "preset" not in st.session_state:
     st.session_state.preset = next(iter(PRESETS))
@@ -290,6 +347,7 @@ st.markdown(
 
 # ---- Sidebar ----
 with st.sidebar:
+    st.toggle("🌙 Dark mode", key="dark_mode", help="Switch between light and dark themes.")
     st.markdown("### Status")
     ok, health, err = api_get("/health") if "_health" not in st.session_state else st.session_state._health
     st.session_state._health = (ok, health, err)
