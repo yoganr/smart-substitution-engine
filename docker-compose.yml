@@ -155,6 +155,25 @@ services:
       start_period: 180s
     restart: unless-stopped
 
+  # ---------------- .NET backend API ----------------
+  backend:
+    build:
+      context: ./backend/SmartSubstitution.Api
+    image: sse-backend:latest
+    container_name: sse-backend
+    depends_on:
+      ai-service:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - MongoDB__ConnectionString=${MONGODB_CONNECTION_STRING}
+      - MongoDB__DatabaseName=hackathon_db
+      - PythonAiService__BaseUrl=http://ai-service:8000
+      - PythonAiService__TimeoutSeconds=30
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
   # ---------------- Streamlit demo UI ----------------
   ui:
     build:
