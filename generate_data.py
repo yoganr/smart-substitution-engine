@@ -105,7 +105,7 @@ def _price(rng, lo, hi, pack, unit, premium):
     return round(base, 2)
 
 
-def generate_products(n: int, rng: random.Random) -> list[dict]:
+def generate_products(n: int, rng: random.Random, oos_rate: float = 0.4) -> list[dict]:
     cats = list(CATEGORIES)
     out: list[dict] = []
     for i in range(n):
@@ -129,7 +129,7 @@ def generate_products(n: int, rng: random.Random) -> list[dict]:
             "base_price": _price(rng, lo, hi, pack, unit, premium),
             "is_active": rng.random() > 0.05,            # ~5% inactive
             "dietary_tags": tags,
-            "stock_quantity": 0 if rng.random() < 0.15 else rng.randint(5, 600),  # ~15% out of stock
+            "stock_quantity": 0 if rng.random() < oos_rate else rng.randint(5, 600),  # out-of-stock fraction = oos_rate
         })
     return out
 
@@ -243,6 +243,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     )
     p.add_argument("--products", type=int, default=2000, help="How many products to generate (default 2000).")
     p.add_argument("--companies", type=int, default=50, help="How many companies to generate (default 50).")
+    p.add_argument("--oos-rate", type=float, default=0.4,
+                   help="Fraction of products that are OUT OF STOCK (0-1, default 0.4). Higher = more substitution demos.")
     p.add_argument("--target", choices=["both", "mongo", "milvus"], default="both")
     p.add_argument("--clear", action="store_true", help="Truncate Mongo + drop Milvus collection first.")
     p.add_argument("--yes", "-y", action="store_true", help="Skip the confirmation prompt for --clear.")
@@ -285,7 +287,7 @@ def main(argv=None) -> int:
 
     # --- generate ---
     seed.info(f"Generating {args.products} products + {args.companies} companies (seed={args.seed})...")
-    products = generate_products(args.products, rng)
+    products = generate_products(args.products, rng, args.oos_rate)
     companies = generate_companies(args.companies, rng)
     contracts = generate_contracts(companies, products, rng) if do_mongo else []
     cat_counts = Counter(p["category_id"] for p in products)
