@@ -6,13 +6,15 @@
 # Services:
 #   etcd / minio / milvus  - Milvus standalone vector DB (product embeddings)
 #   attu                   - Milvus web UI            -> http://localhost:8002
+#   mongo                  - MongoDB catalog database -> mongodb://localhost:27017
 #   ollama / ollama-init   - local LLM (text gen); auto-pulls qwen3.5:0.8b
 #   ai-service             - FastAPI + LangGraph + sentence-transformers (bge-m3, CPU)
+#   backend                - .NET 7 Web API (orchestrator)  -> http://localhost:5000
 #   ui                     - Streamlit demo UI       -> http://localhost:8501
 #
-# The .NET backend (other engineer) is NOT included here — it calls this service
-# at http://localhost:8080 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
-# first start downloads models + images.
+# Full stack: BOTH the Python ai-service and the .NET backend. The backend calls
+# the ai-service at http://ai-service:8080 and Mongo at mongodb://mongo:27017
+# (see INTEGRATION.md). Heavy stack (~6GB RAM); first start downloads models + images.
 # =============================================================================
 # docker compose up --build -d
 # docker compose logs -f ai-service
@@ -178,6 +180,34 @@ services:
       timeout: 5s
       retries: 20
       start_period: 180s
+    restart: unless-stopped
+
+  # ---------------- .NET backend API (orchestrator) ----------------
+  backend:
+    build:
+      context: ./backend
+    image: sse-backend:latest
+    container_name: sse-backend
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    environment:
+      # ASP.NET nested config via the "__" convention (overrides appsettings.json).
+      - ASPNETCORE_URLS=http://+:8080
+      - MongoDB__ConnectionString=mongodb://mongo:27017
+      - MongoDB__DatabaseName=hackathon_db
+      - PythonAiService__BaseUrl=http://ai-service:8080
+      - PythonAiService__TimeoutSeconds=30
+    ports:
+      - "5000:8080"   # host 5000 -> .NET API
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
   # ---------------- Streamlit demo UI ----------------

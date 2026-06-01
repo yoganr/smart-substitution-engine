@@ -14,7 +14,9 @@
 FROM python:3.12-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
