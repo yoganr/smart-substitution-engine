@@ -68,13 +68,17 @@
     /* launcher */
     ".sse-launcher{position:fixed;right:24px;bottom:24px;width:60px;height:60px;border-radius:50%;border:none;" +
     "background:var(--sse-grad);box-shadow:0 8px 24px rgba(5,150,105,.42);cursor:pointer;display:flex;" +
-    "align-items:center;justify-content:center;z-index:2147483646;transition:transform .18s ease,opacity .18s ease;}" +
+    "align-items:center;justify-content:center;z-index:2147483646;transition:transform .18s ease;}" +
     ".sse-launcher:hover{transform:scale(1.06);}" +
-    ".sse-launcher.hidden{transform:scale(0);opacity:0;pointer-events:none;}" +
+    ".sse-launcher .ic{position:absolute;display:flex;align-items:center;justify-content:center;transition:transform .2s ease,opacity .2s ease;}" +
+    ".sse-launcher .ic-close{opacity:0;transform:rotate(-90deg) scale(.6);}" +
+    ".sse-launcher.active .ic-chat{opacity:0;transform:rotate(90deg) scale(.6);}" +
+    ".sse-launcher.active .ic-close{opacity:1;transform:none;}" +
+    ".sse-launcher.active .sse-dot{display:none;}" +
     ".sse-dot{position:absolute;top:12px;right:13px;width:11px;height:11px;border-radius:50%;background:#22c55e;" +
     "border:2px solid #fff;}" +
-    /* panel */
-    ".sse-panel{position:fixed;right:24px;bottom:24px;width:386px;height:min(620px,calc(100vh - 48px));" +
+    /* panel sits ABOVE the always-visible launcher so the icon never disappears */
+    ".sse-panel{position:fixed;right:24px;bottom:96px;width:386px;height:min(600px,calc(100vh - 132px));" +
     "background:var(--sse-surface);border:1px solid var(--sse-border);border-radius:18px;" +
     "box-shadow:0 24px 60px rgba(2,6,23,.28);display:flex;flex-direction:column;overflow:hidden;" +
     "opacity:0;transform:translateY(18px) scale(.98);pointer-events:none;transform-origin:bottom right;" +
@@ -151,12 +155,14 @@
     "cursor:pointer;display:flex;align-items:center;justify-content:center;}" +
     ".sse-send:disabled{opacity:.5;cursor:default;}" +
     ".sse-foot{text-align:center;font-size:10.5px;color:var(--sse-faint);padding:5px;background:var(--sse-surface);}" +
-    "@media (max-width:480px){.sse-panel{right:12px;bottom:84px;width:calc(100vw - 24px);height:calc(100vh - 100px);}" +
+    "@media (max-width:480px){.sse-panel{right:12px;bottom:88px;width:calc(100vw - 24px);height:calc(100vh - 108px);}" +
     ".sse-launcher{right:16px;bottom:16px;}}";
 
   // --- DOM ---------------------------------------------------------------
   var BUBBLE_SVG =
     '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 3C6.9 3 3 6.4 3 11c0 2 1 3.9 2.6 5.2L5 21l4.4-1.9c.8.2 1.7.3 2.6.3 5.1 0 9-3.4 9-8s-3.9-8-9-8z" fill="#fff"/></svg>';
+  var CLOSE_SVG =
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
   var SEND_SVG =
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M3.4 20.4l17.4-7.5c.8-.3.8-1.4 0-1.8L3.4 3.6c-.7-.3-1.4.2-1.4 1L2 9.1c0 .5.4.9.9 1L17 12 2.9 13.9c-.5.1-.9.5-.9 1l0 4.6c0 .7.7 1.2 1.4.9z"/></svg>';
 
@@ -166,7 +172,10 @@
   var root = host.attachShadow({ mode: "open" });
   root.innerHTML =
     "<style>" + CSS + "</style>" +
-    '<button class="sse-launcher" aria-label="Open chat assistant">' + BUBBLE_SVG + '<span class="sse-dot"></span></button>' +
+    '<button class="sse-launcher" aria-label="Open chat assistant">' +
+    '<span class="ic ic-chat">' + BUBBLE_SVG + '</span>' +
+    '<span class="ic ic-close">' + CLOSE_SVG + '</span>' +
+    '<span class="sse-dot"></span></button>' +
     '<div class="sse-panel" role="dialog" aria-label="Substitution Assistant">' +
     '  <div class="sse-head">' +
     '    <div class="av">🔁</div>' +
@@ -360,7 +369,8 @@
   // --- interactions ------------------------------------------------------
   function open() {
     panel.classList.add("open");
-    launcher.classList.add("hidden");
+    launcher.classList.add("active"); // launcher stays visible, icon morphs to ×
+    launcher.setAttribute("aria-label", "Close chat assistant");
     if (!booted) {
       booted = true;
       addMsg("bot", fmt(WELCOME));
@@ -372,14 +382,18 @@
   }
   function close() {
     panel.classList.remove("open");
-    launcher.classList.remove("hidden");
+    launcher.classList.remove("active");
+    launcher.setAttribute("aria-label", "Open chat assistant");
+  }
+  function toggle() {
+    panel.classList.contains("open") ? close() : open();
   }
   function resize() {
     input.style.height = "auto";
     input.style.height = Math.min(input.scrollHeight, 104) + "px";
   }
 
-  launcher.onclick = open;
+  launcher.onclick = toggle; // one always-present button toggles the panel
   root.querySelector(".sse-close").onclick = close;
   root.querySelector(".sse-min").onclick = close;
   sendBtn.onclick = function () {

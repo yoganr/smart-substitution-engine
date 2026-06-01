@@ -554,12 +554,22 @@ st.components.v1.html(
     <script>
     (function() {{
       var doc = window.parent.document;
-      if (doc.getElementById('sse-chat-loader')) return;
-      var s = doc.createElement('script');
-      s.id = 'sse-chat-loader';
-      s.src = '{AI_PUBLIC_URL}/chat/static/widget.js';
-      s.setAttribute('data-api', '{AI_PUBLIC_URL}');
-      doc.body.appendChild(s);
+      var API = '{AI_PUBLIC_URL}';
+      function ensure() {{
+        if (doc.getElementById('sse-chat-widget')) return;   // already mounted
+        var old = doc.getElementById('sse-chat-loader');
+        if (old) old.remove();
+        try {{ window.parent.__sseChat = null; }} catch (e) {{}}  // allow a fresh mount
+        var s = doc.createElement('script');
+        s.id = 'sse-chat-loader';
+        s.src = API + '/chat/static/widget.js?v=2';
+        s.setAttribute('data-api', API);
+        doc.body.appendChild(s);
+      }}
+      ensure();
+      // A Streamlit rerun can wipe body children; re-check briefly so the
+      // launcher can never be permanently lost.
+      var n = 0, t = setInterval(function () {{ ensure(); if (++n > 6) clearInterval(t); }}, 700);
     }})();
     </script>
     """,
