@@ -14,7 +14,9 @@
 FROM python:3.12-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -63,7 +65,7 @@ RUN if [ "$PRELOAD_EMBEDDING_MODEL" = "true" ]; then \
    && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${SSE_EMBEDDING_MODEL}')"; \
     fi
 
-EXPOSE 8000
+EXPOSE 8080
 
 # Single worker: the embedding model loads once at startup (avoids N copies in RAM).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

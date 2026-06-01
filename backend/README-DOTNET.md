@@ -74,7 +74,7 @@ var payload = new {
     max_results = 3,
     use_ai_explanation = false
 };
-// POST to http://localhost:8000/recommendations/replacements
+// POST to http://localhost:8080/recommendations/replacements
 // Verify response contains: replacements[], rejected_candidates[], confidence_pct, confidence_label
 ```
 

@@ -17,5 +17,9 @@ sentence-transformers>=3,<6
 # Vector database client (Milvus) for storing + searching product embeddings.
 pymilvus>=2.5,<2.7
 
+# MongoDB driver — direct read access to the Atlas catalog (the
+# /recommendations/auto path). dnspython (bundled) handles mongodb+srv:// URIs.
+pymongo>=4.6,<5
+
 # HTTP client (Ollama health probe; also pulled in transitively)
 httpx>=0.27

@@ -3,7 +3,7 @@
 A self-contained stack: a Streamlit **UI**, the Python **AI service**, **Ollama**
 (text gen), and a **Milvus** vector DB, wired together. One command brings up
 everything; the only thing outside is the .NET backend (which calls
-`http://localhost:8000`).
+`http://localhost:8080`).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -14,13 +14,13 @@ everything; the only thing outside is the .NET backend (which calls
 │    :8501        bge-m3 CPU)            attu (UI :8002)         │
 └──────────────────────────────────────────────────────────────┘
         ▲
-        │ http://localhost:8000   (.NET backend on host)
+        │ http://localhost:8080   (.NET backend on host)
 ```
 
 | Service | Purpose | Host port |
 |---|---|---|
 | `ui` | Streamlit demo UI | 8501 |
-| `ai-service` | FastAPI recommendation + search API | 8000 |
+| `ai-service` | FastAPI recommendation + search API | 8080 |
 | `ollama` (+`ollama-init`) | LLM explanations (qwen3.5:0.8b) | — |
 | `milvus` (+`etcd`,`minio`) | Vector DB for product embeddings | 19530 |
 | `attu` | Milvus web UI | 8002 |
@@ -60,16 +60,16 @@ Open the **demo UI** at <http://localhost:8501> — pick a scenario and click
 
 ```bash
 # Health (also shows embedding backend/device, Ollama + Milvus status)
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 
 # A real recommendation
-curl -X POST http://localhost:8000/recommendations/replacements \
+curl -X POST http://localhost:8080/recommendations/replacements \
   -H "Content-Type: application/json" \
   -d @ai-service/examples/sample_request.json
 ```
 
 - Demo UI: <http://localhost:8501>
-- Swagger UI: <http://localhost:8000/docs>
+- Swagger UI: <http://localhost:8080/docs>
 - Milvus UI (Attu): <http://localhost:8002>
 
 ## Everyday commands
@@ -85,11 +85,11 @@ docker compose up -d --no-deps ai-service   # restart just the AI service
 
 ## Connecting the .NET backend
 
-- **.NET running on the host** → use `http://localhost:8000` (default in
+- **.NET running on the host** → use `http://localhost:8080` (default in
   `appsettings.json`). Nothing else to do.
 - **.NET also in Docker** → put it on the same compose network and call
-  `http://ai-service:8000`, or from a separate compose use
-  `http://host.docker.internal:8000`.
+  `http://ai-service:8080`, or from a separate compose use
+  `http://host.docker.internal:8080`.
 
 ## Configuration
 
@@ -127,5 +127,5 @@ The default image uses **CPU PyTorch** for portability. For GPU embeddings:
 |---|---|
 | `ai-service` unhealthy on first run | Still downloading bge-m3 — watch `docker compose logs -f ai-service`; it recovers when the load finishes. |
 | Explanations are templates, not LLM | `qwen3.5:0.8b` not pulled yet — check `docker compose logs ollama-init`. |
-| Port 8000 already in use | Change the `ports` mapping to e.g. `8080:8000`. |
+| Port 8080 already in use | Change the `ports` mapping to e.g. `9090:8080`. |
 | Want a clean slate | `docker compose down -v` removes the cached models. |
