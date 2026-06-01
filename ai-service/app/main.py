@@ -9,11 +9,15 @@ Then open http://localhost:8000/docs for interactive Swagger docs.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
+from app.chat import build_chat_service
 from app.config import get_settings
 from app.engine import build_engine
 from app.logging_config import configure_logging, get_logger
@@ -22,6 +26,8 @@ from app.providers import probe_ollama
 from app.schemas import (
     AutoReplacementRequest,
     CandidateProduct,
+    ChatRequest,
+    ChatResponse,
     Company,
     ContractItem,
     HealthResponse,
@@ -33,6 +39,8 @@ from app.schemas import (
     SearchSimilarRequest,
     SearchSimilarResponse,
 )
+
+STATIC_DIR = Path(__file__).resolve().parent / "chat" / "static"
 
 logger = get_logger(__name__)
 
@@ -66,6 +74,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.engine = build_engine(settings)
     app.state.mongo_repo = build_mongo_repo(settings)
+    app.state.chat = build_chat_service(settings, app.state.engine, app.state.mongo_repo)
     engine = app.state.engine
     logger.info(
         "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s, milvus=%s, atlas=%s)",
@@ -93,8 +102,22 @@ app = FastAPI(
         {"name": "system", "description": "Health and diagnostics."},
         {"name": "recommendations", "description": "Replacement recommendations."},
         {"name": "vector-search", "description": "Milvus-backed catalog indexing + similarity search."},
+        {"name": "chatbot", "description": "Conversational assistant (orchestrator + agents) + embeddable widget."},
     ],
 )
+
+# The chat widget is loaded cross-origin (e.g. from the Streamlit demo on :8501),
+# so allow browser fetches from any origin. Tighten for production deployments.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve the self-contained chat widget assets (widget.js, index.html).
+if STATIC_DIR.is_dir():
+    app.mount("/chat/static", StaticFiles(directory=STATIC_DIR), name="chat-static")
 
 
 @app.get("/", include_in_schema=False)
@@ -276,3 +299,31 @@ async def recommend_auto(
         use_ai_explanation=request.use_ai_explanation,
     )
     return await engine.recommend(rec_request)
+
+
+# ---------------------------------------------------------------------------
+# Chatbot (conversational front door + embeddable widget)
+# ---------------------------------------------------------------------------
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    tags=["chatbot"],
+    summary="Talk to the substitution assistant",
+    response_description="The assistant's reply with quick-reply suggestions and rich result cards.",
+)
+async def chat(request: ChatRequest, http_request: Request) -> ChatResponse:
+    """One conversational turn. Omit ``session_id`` on the first message; reuse
+    the one returned on every subsequent turn to keep context."""
+    service = getattr(http_request.app.state, "chat", None)
+    if service is None:
+        raise HTTPException(status_code=503, detail="Chat service is not available.")
+    return await service.handle(request.session_id, request.message)
+
+
+@app.get("/chat", include_in_schema=False)
+async def chat_page() -> FileResponse:
+    """Standalone demo page that hosts the floating chat widget."""
+    index = STATIC_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="Chat widget page not found.")
+    return FileResponse(index)

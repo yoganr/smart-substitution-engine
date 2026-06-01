@@ -18,6 +18,9 @@ import requests
 import streamlit as st
 
 AI_URL_DEFAULT = os.environ.get("AI_SERVICE_URL", "http://localhost:8000").rstrip("/")
+# Browser-reachable AI URL for the chat widget (the user's browser calls it
+# directly, so it must NOT be the in-cluster hostname like "ai-service").
+AI_PUBLIC_URL = os.environ.get("AI_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 TIMEOUT = 90  # explanations can take a few seconds
 
 LABEL_COLORS = {
@@ -539,3 +542,26 @@ with tab_search:
         else:
             st.markdown('<div class="card">' + "".join(render_hit(h) for h in hits) + '</div>',
                         unsafe_allow_html=True)
+
+# =========================================================================== #
+# Floating chat assistant
+# Inject the self-contained widget (served by the AI service) into the parent
+# document so the launcher floats over the whole app, bottom-right. It calls the
+# AI service directly from the browser, so it uses the public URL + CORS.
+# =========================================================================== #
+st.components.v1.html(
+    f"""
+    <script>
+    (function() {{
+      var doc = window.parent.document;
+      if (doc.getElementById('sse-chat-loader')) return;
+      var s = doc.createElement('script');
+      s.id = 'sse-chat-loader';
+      s.src = '{AI_PUBLIC_URL}/chat/static/widget.js';
+      s.setAttribute('data-api', '{AI_PUBLIC_URL}');
+      doc.body.appendChild(s);
+    }})();
+    </script>
+    """,
+    height=0,
+)

@@ -138,6 +138,11 @@ services:
       - SSE_ENABLE_MILVUS=true
       - SSE_MILVUS_URI=http://milvus:19530
       - SSE_MILVUS_COLLECTION=product_embeddings
+      # Direct Atlas access powers the chatbot's catalog lookups (same
+      # connection string the .NET backend uses). Empty -> chat catalog features
+      # degrade gracefully; the rest of the service is unaffected.
+      - SSE_MONGO_URI=${MONGODB_CONNECTION_STRING}
+      - SSE_MONGO_DB=hackathon_db
       - HF_HOME=/cache/huggingface
     volumes:
       - hf-cache:/cache/huggingface
@@ -185,6 +190,9 @@ services:
         condition: service_healthy
     environment:
       - AI_SERVICE_URL=http://ai-service:8000
+      # Browser-reachable URL for the embedded chat widget (loaded by the
+      # user's browser, not from inside the container network).
+      - AI_PUBLIC_URL=http://localhost:8000
     ports:
       - "8501:8501"
     restart: unless-stopped

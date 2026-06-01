@@ -251,3 +251,69 @@ class SearchHit(BaseModel):
 class SearchSimilarResponse(BaseModel):
     count: int
     results: list[SearchHit] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Chatbot (conversational front door over the engine)
+# ---------------------------------------------------------------------------
+class ChatRequest(BaseModel):
+    """A single user turn. ``session_id`` ties multi-turn context together; the
+    server mints one when absent and echoes it back."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "session_id": "9f1c0c4e-...",
+                "message": "Find a replacement for chicken breast, I need 20",
+            }
+        }
+    )
+
+    message: str = Field(..., min_length=1, examples=["What can you help me with?"])
+    session_id: Optional[str] = Field(
+        default=None, description="Opaque conversation id; omit on the first turn."
+    )
+
+
+class ChatCard(BaseModel):
+    """A structured result the widget renders as a rich card. ``type`` selects
+    the template; the remaining fields are optional and template-specific so one
+    model covers replacement / similar / product cards."""
+
+    type: str = Field(..., examples=["replacement"], description="'replacement' | 'similar' | 'product'")
+    product_id: Optional[str] = None
+    name: str
+    category_id: Optional[str] = None
+    brand: Optional[str] = None
+    unit: Optional[str] = None
+
+    # replacement-specific
+    rank: Optional[int] = None
+    final_score: Optional[int] = None
+    confidence_pct: Optional[int] = None
+    confidence_label: Optional[str] = None
+    score_breakdown: Optional[ScoreBreakdown] = None
+    explanation: Optional[str] = None
+    effective_price: Optional[float] = None
+    stock_quantity: Optional[float] = None
+    is_preferred: bool = False
+    is_under_contract: bool = False
+
+    # similar-specific
+    score: Optional[float] = None
+
+    # product-info-specific
+    base_price: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+class ChatResponse(BaseModel):
+    session_id: str
+    reply: str = Field(..., description="Assistant message (light markdown).")
+    suggestions: list[str] = Field(
+        default_factory=list, description="Quick-reply chips that guide the next step."
+    )
+    cards: list[ChatCard] = Field(
+        default_factory=list, description="Rich result cards (ranked replacements, etc.)."
+    )
+    intent: str = Field(default="guide", description="Detected intent for this turn.")

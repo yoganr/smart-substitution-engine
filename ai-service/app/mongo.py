@@ -17,6 +17,7 @@ event loop free — the same pattern the Milvus wrapper uses.
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Optional
 
 from app.config import Settings
@@ -125,6 +126,61 @@ class MongoCatalogRepository:
                 row["stock_quantity"] = int(stock)
                 candidates.append(row)
         return candidates
+
+    # -- chatbot helpers (free-text catalog lookup) ------------------------
+    async def search_products(self, query: str, limit: int = 8) -> list[dict]:
+        """Fuzzy product lookup by name (or product id) for the chatbot.
+
+        Case-insensitive substring match on ``Name``/``ProductId`` so a user can
+        type "chicken breast" and get concrete catalog products back, each with
+        its live stock joined in. Ranking/disambiguation is left to the caller.
+        """
+        return await asyncio.to_thread(self._search_products_sync, query, limit)
+
+    def _search_products_sync(self, query: str, limit: int) -> list[dict]:
+        term = (query or "").strip()
+        if not term:
+            return []
+        pattern = re.escape(term)
+        products = list(
+            self._db[PRODUCTS]
+            .find(
+                {
+                    "$or": [
+                        {"Name": {"$regex": pattern, "$options": "i"}},
+                        {"ProductId": {"$regex": pattern, "$options": "i"}},
+                    ]
+                }
+            )
+            .limit(max(1, limit) * 3)  # over-fetch; caller re-ranks then trims
+        )
+        if not products:
+            return []
+        ids = [p.get("ProductId") for p in products]
+        stock_map = {
+            i["ProductId"]: i.get("StockQuantity", 0)
+            for i in self._db[INVENTORY].find({"ProductId": {"$in": ids}})
+        }
+        rows: list[dict] = []
+        for p in products:
+            row = _product_to_dict(p)
+            row["stock_quantity"] = int(stock_map.get(p.get("ProductId"), 0) or 0)
+            rows.append(row)
+        return rows[:limit] if limit else rows
+
+    async def list_companies(self, limit: int = 50) -> list[dict]:
+        """All companies as ``[{id, name}]`` (the bot defaults to the first)."""
+        return await asyncio.to_thread(self._list_companies_sync, limit)
+
+    def _list_companies_sync(self, limit: int) -> list[dict]:
+        docs = self._db[COMPANIES].find().limit(max(1, limit))
+        return [{"id": d.get("CompanyId"), "name": d.get("Name", "")} for d in docs if d.get("CompanyId")]
+
+    async def list_categories(self) -> list[str]:
+        """Distinct active category ids (for guiding the user)."""
+        return await asyncio.to_thread(
+            lambda: sorted(c for c in self._db[PRODUCTS].distinct("CategoryId") if c)
+        )
 
 
 def build_mongo_repo(settings: Settings) -> Optional[MongoCatalogRepository]:
