@@ -263,7 +263,7 @@ mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>?retryWrites=t
     "DatabaseName": "hackathon_db"
   },
   "PythonAiService": {
-    "BaseUrl": "http://localhost:8080"
+    "BaseUrl": "http://localhost:8000"
   }
 }
 ```

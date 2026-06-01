@@ -1,9 +1,9 @@
 """FastAPI entry point for the Smart Substitution Engine AI service.
 
 Run locally:
-    uvicorn app.main:app --reload --port 8080
+    uvicorn app.main:app --reload --port 8000
 
-Then open http://localhost:8080/docs for interactive Swagger docs.
+Then open http://localhost:8000/docs for interactive Swagger docs.
 """
 
 from __future__ import annotations

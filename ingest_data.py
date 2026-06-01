@@ -503,7 +503,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     do_milvus = args.target in ("both", "milvus")
 
     # Resolve config.
-    mongo_uri = resolve(args.mongo_uri, "MONGODB_URI", "SSE_MONGO_URI", default=DEFAULT_MONGO_URI)
+    mongo_uri = resolve(
+        args.mongo_uri, "MONGODB_CONNECTION_STRING", "MONGODB_URI", "SSE_MONGO_URI",
+        default=DEFAULT_MONGO_URI,
+    )
     db_name = resolve(args.db, "SSE_MONGO_DB", default=DEFAULT_DB)
     milvus_uri = resolve(args.milvus_uri, "SSE_MILVUS_URI", default=DEFAULT_MILVUS_URI)
     milvus_token = resolve(args.milvus_token, "SSE_MILVUS_TOKEN", default=DEFAULT_MILVUS_TOKEN)

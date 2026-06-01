@@ -3,7 +3,7 @@
 This is everything the **C# .NET engineer** needs to call the Python AI
 Recommendation Service. The Python side is done, tested, and live-verified.
 
-> TL;DR: `POST http://localhost:8080/recommendations/replacements` with the JSON
+> TL;DR: `POST http://localhost:8000/recommendations/replacements` with the JSON
 > below, deserialize the response, save it to `recommendation_logs`, return it to
 > the client. The Python service is **stateless** — it never touches MongoDB.
 
@@ -14,7 +14,7 @@ Recommendation Service. The Python side is done, tested, and live-verified.
 **Easiest — Docker (brings up the AI service + Ollama together):**
 
 ```bash
-docker compose up --build      # serves on http://localhost:8080
+docker compose up --build      # serves on http://localhost:8000
 ```
 
 **Or local Python** (on the AI engineer's machine or yours):
@@ -25,23 +25,23 @@ cd ai-service           # the Python service lives here
 # Ollama must be running (it powers the text explanations)
 ollama serve            # if not already running
 
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-- Swagger UI: <http://localhost:8080/docs>
-- Health (also reports Ollama status): `GET http://localhost:8080/health`
+- Swagger UI: <http://localhost:8000/docs>
+- Health (also reports Ollama status): `GET http://localhost:8000/health`
 
 Point your .NET config at it:
 
 ```jsonc
 // appsettings.json
 {
-  "PythonAiService": { "BaseUrl": "http://localhost:8080" }
+  "PythonAiService": { "BaseUrl": "http://localhost:8000" }
 }
 ```
 
 If the AI service runs on another laptop, use that machine's LAN IP, e.g.
-`http://192.168.1.42:8080`.
+`http://192.168.1.42:8000`.
 
 ---
 
@@ -298,7 +298,7 @@ public sealed class AiRecommendationClient : IAiRecommendationClient
 builder.Services.AddHttpClient<IAiRecommendationClient, AiRecommendationClient>(client =>
 {
     var baseUrl = builder.Configuration["PythonAiService:BaseUrl"]
-                  ?? "http://localhost:8080";
+                  ?? "http://localhost:8000";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(60); // LLM explanations can take a few seconds
 });
@@ -380,7 +380,7 @@ app.MapPost("/recommendations/replacements", async (
 
 ```powershell
 # from the repo root
-curl -X POST http://localhost:8080/recommendations/replacements `
+curl -X POST http://localhost:8000/recommendations/replacements `
   -H "Content-Type: application/json" `
   -d "@ai-service/examples/sample_request.json"
 ```

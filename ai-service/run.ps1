@@ -1,8 +1,8 @@
 # Run the Smart Substitution Engine AI service.
-#   ./run.ps1            -> starts on port 8080 with auto-reload
-#   ./run.ps1 -Port 8080 -> custom port
+#   ./run.ps1            -> starts on port 8000 with auto-reload
+#   ./run.ps1 -Port 8000 -> custom port
 param(
-    [int]$Port = 8080,
+    [int]$Port = 8000,
     [switch]$NoReload
 )
 
