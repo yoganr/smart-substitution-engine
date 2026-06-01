@@ -1,0 +1,13 @@
+# Keep the build context small; never copy host build output or secrets in.
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README-DOTNET.md
+
+# Dev-only secrets (real connection strings) — the container uses env instead.
+**/appsettings.Development.json
