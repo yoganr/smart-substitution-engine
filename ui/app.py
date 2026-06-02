@@ -309,7 +309,7 @@ def render_replacement(rep: dict, rank: int) -> str:
         f'<span class="bar-val">{b[key]}/{mx}</span></div>'
         for key, label, mx in DIMENSIONS
     )
-    ai = '<span class="ai">✨ AI-generated</span>' if rep.get("explanation_source") == "ollama" else ""
+    ai = '<span class="ai"></span>' if rep.get("explanation_source") == "ollama" else ""
     return (
         f'<div class="card">'
         f'<div class="rep-head">'
@@ -371,7 +371,7 @@ with st.sidebar:
         idx = vs.get("indexed_products", 0) if vs.get("available") else "-"
         rows = [
             ("on", "Service online"),
-            ("on" if ai_ready else "off", "AI explanations" + ("" if ai_ready else " · standard")),
+            ("on" if ai_ready else "off", "Explanations" + ("" if ai_ready else " · standard")),
             ("on" if emb.get("available") else "off", "Semantic matching" + ("" if emb.get("available") else " · basic")),
             ("on" if vs.get("available") else "off", f"Search index · {idx} products"),
         ]
