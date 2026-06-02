@@ -12,4 +12,6 @@ toolbarMode = "minimal"
 
 [theme]
 base = "light"
-primaryColor = "#2563eb"
+# cisbox forest green — drives native widgets (primary button, slider, toggle,
+# tab underline, focus ring). Custom CSS in app.py re-themes everything else.
+primaryColor = "#215B33"
