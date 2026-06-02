@@ -259,13 +259,51 @@ def render_replacement(rep: dict, rank: int) -> str:
         f'</div>'
     )
 
+def _resolve_part_types(p: dict):
+    """Return (cu, tu) PartType dicts. Falls back to NumberInUnit when Code is absent."""
+    parts = p.get("partTypes") or []
+    cu = next((pt for pt in parts if pt.get("code") == "CU"), None)
+    tu = next((pt for pt in parts if pt.get("code") == "TU"), None)
+    if cu is None and tu is None and parts:
+        def _niu(pt):
+            try: return float(pt.get("numberInUnit") or "1")
+            except: return 1.0
+        sorted_pts = sorted(parts, key=_niu)
+        cu = sorted_pts[0]                              # smallest NumberInUnit = CU (= 1)
+        tu = sorted_pts[-1] if len(sorted_pts) > 1 else None  # largest = TU
+    return cu, tu
+
 def render_product_card(p: dict) -> str:
-    cu = next((pt for pt in p.get("partTypes", []) if pt.get("code") == "CU"), None)
-    tu = next((pt for pt in p.get("partTypes", []) if pt.get("code") == "TU"), None)
-    pt = cu or tu
-    price = pt["price"].get("unitPrice", "—") if pt else "—"
-    unit  = pt.get("unit", "") if pt else ""
-    cats  = " ".join(chip(c, "cat") for c in (p.get("catalogCategories") or [])[:2])
+    cu, tu = _resolve_part_types(p)
+
+    def fmt_price(pt):
+        if not pt: return None
+        pr   = (pt.get("price") or {})
+        uprice = pr.get("unitPrice", "")
+        niu    = pt.get("numberInUnit", "1") or "1"
+        unit   = pt.get("unit", "") or ""
+        try:
+            val = float(uprice)
+            qty = float(niu)
+        except (ValueError, TypeError):
+            return None
+        if val == 0: return None
+        if qty == 1:
+            return f"{val:.2f} / {unit}"             # CU: "37.50 / KG"
+        total = (pt.get("price") or {}).get("price", "")
+        try:
+            total_val = float(total)
+            return f"{val:.2f} / {unit}  ·  {total_val:.2f} per {qty:.0f} {unit}"
+        except (ValueError, TypeError):
+            return f"{val:.2f} / {unit}"
+
+    cu_price = fmt_price(cu)
+    tu_price = fmt_price(tu) if tu and tu is not cu else None
+    price_html = cu_price or tu_price or "—"
+    if cu_price and tu_price:
+        price_html = f"{cu_price} &nbsp;<span style='color:#94a3b8'>|</span>&nbsp; {tu_price}"
+
+    cats = " ".join(chip(c, "cat") for c in (p.get("catalogCategories") or [])[:2])
     return (
         f'<div class="pcard">'
         f'<span class="pid">{p.get("itemNumber","")}</span>'
@@ -273,7 +311,7 @@ def render_product_card(p: dict) -> str:
         f'<span class="plabel">Seller</span>{p.get("sellerName","")} &nbsp;'
         f'<span class="plabel">Contract</span>{p.get("contractNumber","")} &nbsp;'
         f'<span class="plabel">Seller #</span>{p.get("sellerAccountNumber","")} &nbsp;'
-        f'<span class="plabel">Price</span>{price} {unit}'
+        f'<span class="plabel">Price</span>{price_html}'
         f'<div style="margin-top:5px">{cats}</div>'
         f'</div>'
     )
@@ -402,11 +440,20 @@ with tab_reco:
 
     # ── Step 3: Request details ───────────────────────────────────────────────
     st.markdown('<div class="sec">Step 3 — Request details</div>', unsafe_allow_html=True)
-    o1, o2, o3 = st.columns([1.5, 1.5, 2])
+    o1, o2, o3, o4 = st.columns([1.5, 1.5, 1.5, 2])
     quantity    = o1.number_input("Quantity needed", value=10, min_value=1, step=1)
     max_results = o2.slider("Max results", 1, 10, 3)
-    use_ai      = o3.toggle("AI explanations", value=True,
+    part_type_label = o3.selectbox(
+        "Ordering unit",
+        ["Any", "CU — individual piece", "TU — whole package"],
+        help="CU = consumer unit (e.g. 1 can). TU = trade unit (e.g. pack of 10). "
+             "Triggers replacement even when the product is in stock in the other format.",
+    )
+    use_ai      = o4.toggle("AI explanations", value=True,
                             help="Off = instant rule-based explanations.")
+
+    part_type_map = {"CU — individual piece": "CU", "TU — whole package": "TU", "Any": None}
+    preferred_part_type = part_type_map[part_type_label]
 
     go = st.button(
         "Find replacements",
@@ -422,11 +469,13 @@ with tab_reco:
                 "sellerAccountNumber": selected["sellerAccountNumber"],
                 "contractNumber":      selected["contractNumber"],
             },
-            "contractNumbers":  contract_numbers,
+            "contractNumbers":   contract_numbers,
             "requestedQuantity": quantity,
             "maxResults":        max_results,
             "useAiExplanation":  use_ai,
         }
+        if preferred_part_type:
+            payload["preferredPartType"] = preferred_part_type
         with st.spinner("Finding the best alternatives…"):
             ok, data, err = backend_post("/recommendations/replacements", payload)
         st.session_state.reco = {"ok": ok, "data": data, "err": err}
@@ -445,7 +494,8 @@ with tab_reco:
     else:
         data = reco["data"]
         if not data.get("replacementNeeded"):
-            st.success("Product is in stock — no replacement needed.")
+            unit_label = {"CU": " in CU (individual units)", "TU": " in TU (whole packages)"}.get(preferred_part_type or "", "")
+            st.success(f"Product is available{unit_label} — no replacement needed.")
         else:
             reps = data.get("replacements") or []
             if not reps:

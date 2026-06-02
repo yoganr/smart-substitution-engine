@@ -8,92 +8,93 @@ using SmartSubstitution.Api.Services;
 namespace SmartSubstitution.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("recommendations")]
 public class RecommendationController : ControllerBase
 {
-    private readonly IMongoDatabase _db;
-    private readonly CandidateProductService _candidates;
-    private readonly PythonAiClient _pythonAi;
+    private readonly IMongoDatabase      _db;
+    private readonly LocalCatalogService _catalog;
+    private readonly PythonAiClient      _pythonAi;
 
     public RecommendationController(
         IMongoDatabase db,
-        CandidateProductService candidates,
+        LocalCatalogService catalog,
         PythonAiClient pythonAi)
     {
-        _db = db;
-        _candidates = candidates;
+        _db       = db;
+        _catalog  = catalog;
         _pythonAi = pythonAi;
     }
 
     /// <summary>
-    /// POST /recommendation/replacements
-    /// Checks inventory, queries candidates, calls Python AI, logs result.
+    /// POST /recommendations/replacements
+    ///
+    /// Finds replacement candidates for an out-of-stock product, restricted
+    /// to the contract numbers (catalogs) the requesting user has access to.
+    /// All candidates ARE contract products, so they all receive the
+    /// contract-match scoring bonus in the Python AI service.
     /// </summary>
     [HttpPost("replacements")]
     public async Task<ActionResult<ReplacementResponseDto>> GetReplacements(
         [FromBody] ReplacementRequestDto request,
         CancellationToken ct)
     {
-        var products = _db.GetCollection<Product>("products");
-        var inventory = _db.GetCollection<Inventory>("inventory");
-        var contracts = _db.GetCollection<Contract>("contracts");
-        var logs = _db.GetCollection<RecommendationLog>("recommendation_logs");
-        var companies = _db.GetCollection<Company>("companies");
+        if (request.Product is null)
+            return BadRequest(new { error = "product (itemNumber, sellerAccountNumber, contractNumber) is required" });
+        if (request.ContractNumbers is not { Count: > 0 })
+            return BadRequest(new { error = "contractNumbers must contain at least one value" });
 
-        // 1. Load company
-        var company = await companies
-            .Find(c => c.CompanyId == request.CompanyId)
-            .FirstOrDefaultAsync(ct);
-        if (company is null)
-            return NotFound(new { error = $"Company '{request.CompanyId}' not found" });
+        var p = request.Product;
+        var preferredPartType = request.PreferredPartType?.ToUpperInvariant() switch
+        {
+            "CU" => "CU",
+            "TU" => "TU",
+            _    => null,
+        };
 
-        // 2. Load requested product
-        var product = await products
-            .Find(p => p.ProductId == request.ProductId)
-            .FirstOrDefaultAsync(ct);
+        // 1. Exact product lookup via composite key
+        var product = await _catalog.GetByCompositeKeyAsync(p.ItemNumber, p.SellerAccountNumber, p.ContractNumber, ct);
         if (product is null)
-            return NotFound(new { error = $"Product '{request.ProductId}' not found" });
+            return NotFound(new { error = $"Product '{p.ItemNumber}' not found for seller '{p.SellerAccountNumber}' / contract '{p.ContractNumber}'" });
 
-        // 3. Check inventory
-        var inv = await inventory
-            .Find(i => i.ProductId == request.ProductId)
-            .FirstOrDefaultAsync(ct);
-
-        if (inv is not null && inv.StockQuantity >= request.RequestedQuantity)
+        // 2. Check availability for the preferred PartType specifically.
+        //    e.g. Coca-Cola only in TU but user wants CU → not available → find replacements.
+        //    No StockAreas = stock unknown → proceed to find replacements.
+        var available = preferredPartType switch
+        {
+            "CU" => product.IsCuAvailable,
+            "TU" => product.IsTuAvailable,
+            _    => product.IsAvailable,
+        };
+        if (available)
             return Ok(new ReplacementResponseDto(ReplacementNeeded: false));
 
-        // 4. Load company contracts
-        var contract = await contracts
-            .Find(c => c.CompanyId == request.CompanyId)
-            .FirstOrDefaultAsync(ct);
-        var contractItems = contract?.Items ?? new();
+        // 3. Find candidates: same category, user's contract numbers, preferred PartType
+        var candidates = await _catalog.GetCandidatesAsync(product, request.ContractNumbers, preferredPartType, ct);
 
-        // 5. Query candidate products
-        var candidatesWithStock = await _candidates.GetCandidatesAsync(
-            product.CategoryId, product.ProductId, contractItems, ct);
+        // 4. Build Python AI request.
+        //    Every candidate is a contracted product, so we pass it as both a
+        //    candidateProduct and a contractItem — this ensures the Python scorer
+        //    awards the full contract-match bonus to every result.
+        var contractItems = candidates
+            .Select(c => new PythonContractItemDto(
+                ProductId:     c.ItemNumber,
+                ContractPrice: (double)(c.ConsumerUnit?.Price.UnitPriceDecimal
+                                        ?? c.TradeUnit?.Price.UnitPriceDecimal ?? 0m),
+                IsPreferred:   c.PreferredProduct))
+            .ToList();
 
-        // 6. Build Python request payload
         var pythonRequest = new PythonReplacementRequestDto(
-            Company: new PythonCompanyDto(company.CompanyId, company.Name),
-            RequestedProduct: new PythonProductDto(
-                product.ProductId, product.Name, product.CategoryId,
-                product.Brand, product.Unit, product.PackSize, product.BasePrice,
-                product.DietaryTags),
+            Company:           new PythonCompanyDto(
+                                   Id:   request.ContractNumbers.First(),
+                                   Name: string.Join(", ", request.ContractNumbers)),
+            RequestedProduct:  LocalCatalogService.ToRequestedProduct(product, preferredPartType),
             RequestedQuantity: request.RequestedQuantity,
-            ContractItems: contractItems
-                .Select(ci => new PythonContractItemDto(ci.ProductId, ci.ContractPrice, ci.IsPreferred))
-                .ToList(),
-            CandidateProducts: candidatesWithStock.Select(c =>
-                new PythonCandidateProductDto(
-                    c.Product.ProductId, c.Product.Name, c.Product.CategoryId,
-                    c.Product.Brand, c.Product.Unit, c.Product.PackSize,
-                    c.Product.BasePrice, c.StockQuantity,
-                    c.ContractPrice, c.Product.IsActive, c.Product.DietaryTags))
-                .ToList(),
-            MaxResults: request.MaxResults,
-            UseAiExplanation: request.UseAiExplanation);
+            ContractItems:     contractItems,
+            CandidateProducts: candidates.Select(c => LocalCatalogService.ToCandidate(c, preferredPartType)).ToList(),
+            MaxResults:        request.MaxResults,
+            UseAiExplanation:  request.UseAiExplanation);
 
-        // 7. Call Python AI service
+        // 5. Call Python AI service
         var sw = Stopwatch.StartNew();
         PythonReplacementResponseDto? pythonResponse;
         try
@@ -106,19 +107,22 @@ public class RecommendationController : ControllerBase
         }
         sw.Stop();
 
-        // 8. Log to Atlas
+        // 6. Log to Atlas
         var log = new RecommendationLog
         {
-            CompanyId = request.CompanyId,
-            RequestedProductId = request.ProductId,
-            ReplacementCount = pythonResponse?.Replacements?.Count ?? 0,
-            TopProductId = pythonResponse?.Replacements?.FirstOrDefault()?.ProductId,
-            TopScore = pythonResponse?.Replacements?.FirstOrDefault()?.FinalScore ?? 0,
-            PythonResponseMs = sw.ElapsedMilliseconds,
+            ItemNumber         = p.ItemNumber,
+            SellerAccountNumber= p.SellerAccountNumber,
+            ContractNumber     = p.ContractNumber,
+            ContractNumbers    = request.ContractNumbers,
+            ReplacementCount   = pythonResponse?.Replacements?.Count ?? 0,
+            TopProductId       = pythonResponse?.Replacements?.FirstOrDefault()?.ProductId,
+            TopScore           = pythonResponse?.Replacements?.FirstOrDefault()?.FinalScore ?? 0,
+            PythonResponseMs   = sw.ElapsedMilliseconds,
         };
+        var logs = _db.GetCollection<RecommendationLog>("recommendation_logs");
         await logs.InsertOneAsync(log, cancellationToken: ct);
 
-        // 9. Map and return
+        // 7. Map and return
         if (pythonResponse is null)
             return StatusCode(502, new { error = "Empty response from AI service" });
 
@@ -144,8 +148,8 @@ public class RecommendationController : ControllerBase
     [HttpGet("logs")]
     public async Task<IActionResult> GetLogs(CancellationToken ct)
     {
-        var logs = _db.GetCollection<RecommendationLog>("recommendation_logs");
-        var result = await logs.Find(_ => true).Limit(100).ToListAsync(ct);
+        var logs   = _db.GetCollection<RecommendationLog>("recommendation_logs");
+        var result = await logs.Find(_ => true).SortByDescending(l => l.CreatedAt).Limit(100).ToListAsync(ct);
         return Ok(result);
     }
 }

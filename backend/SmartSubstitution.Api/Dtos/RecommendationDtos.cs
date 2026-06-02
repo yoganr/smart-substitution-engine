@@ -2,12 +2,28 @@ namespace SmartSubstitution.Api.Dtos;
 
 // ── Client-facing request/response ──────────────────────────────────────────
 
+/// <summary>
+/// Product identifier — matches the composite _id in the catalog:
+/// { ItemNumber, SellerAccountNumber, ContractNumber }.
+/// </summary>
+public record ProductIdentifierDto(
+    string ItemNumber,
+    string SellerAccountNumber,
+    string ContractNumber);
+
+/// <summary>
+/// Optional preferred ordering unit. "CU" = individual piece (NumberInUnit=1),
+/// "TU" = whole package (NumberInUnit>1, e.g. 10). Null means no preference.
+/// When specified, replacement is triggered even if the product is "in stock"
+/// but only available in the other PartType.
+/// </summary>
 public record ReplacementRequestDto(
-    string CompanyId,
-    string ProductId,
+    ProductIdentifierDto Product,
+    List<string> ContractNumbers,
     int RequestedQuantity,
     int MaxResults = 3,
-    bool UseAiExplanation = true);
+    bool UseAiExplanation = true,
+    string? PreferredPartType = null);
 
 public record ScoreBreakdownDto(
     int CategorySimilarity,

@@ -14,11 +14,21 @@ builder.Services.Configure<MongoDbSettings>(
 builder.Services.Configure<PythonAiSettings>(
     builder.Configuration.GetSection("PythonAiService"));
 
-// ── MongoDB - Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
+builder.Services.Configure<LocalMongoDbSettings>(
+    builder.Configuration.GetSection("LocalMongoDB"));
+
+// ── MongoDB — Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
 
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
     var settings = sp.GetRequiredService<IOptions<MongoDbSettings>>().Value;
+    return new MongoClient(settings.ConnectionString);
+});
+
+// Local network MongoDB (keyed so it doesn't collide with the Atlas client above)
+builder.Services.AddKeyedSingleton<IMongoClient>("local", (sp, _) =>
+{
+    var settings = sp.GetRequiredService<IOptions<LocalMongoDbSettings>>().Value;
     return new MongoClient(settings.ConnectionString);
 });
 
@@ -31,7 +41,7 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 
 // ── Application services ─────────────────────────────────────────────────────
 
-builder.Services.AddScoped<CandidateProductService>();
+builder.Services.AddScoped<LocalCatalogService>();
 
 builder.Services.AddHttpClient<PythonAiClient>((sp, http) =>
 {

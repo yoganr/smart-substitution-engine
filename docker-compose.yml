@@ -174,7 +174,10 @@ services:
       - MongoDB__ConnectionString=${MONGODB_CONNECTION_STRING}
       - MongoDB__DatabaseName=hackathon_db
       - PythonAiService__BaseUrl=http://ai-service:8000
-      - PythonAiService__TimeoutSeconds=30
+      - PythonAiService__TimeoutSeconds=120
+      - LocalMongoDB__ConnectionString=${LOCAL_MONGODB_CONNECTION_STRING}
+      - LocalMongoDB__DatabaseName=${LOCAL_MONGODB_DATABASE_NAME}
+      - LocalMongoDB__CollectionName=${LOCAL_MONGODB_COLLECTION_NAME}
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -188,8 +191,11 @@ services:
     depends_on:
       ai-service:
         condition: service_healthy
+      backend:
+        condition: service_started
     environment:
       - AI_SERVICE_URL=http://ai-service:8000
+      - BACKEND_URL=http://backend:8080
       # Browser-reachable URL for the embedded chat widget (loaded by the
       # user's browser, not from inside the container network).
       - AI_PUBLIC_URL=http://localhost:8000

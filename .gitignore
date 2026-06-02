@@ -223,3 +223,4 @@ backend/**/obj/
 backend/**/bin/
 backend/**/*.user
 backend/**/appsettings.Development.json
+.gstack/

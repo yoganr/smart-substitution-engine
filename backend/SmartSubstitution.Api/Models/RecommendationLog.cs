@@ -9,11 +9,13 @@ public class RecommendationLog
     [BsonRepresentation(BsonType.ObjectId)]
     public string? Id { get; set; }
 
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    public string CompanyId { get; set; } = null!;
-    public string RequestedProductId { get; set; } = null!;
+    public string ItemNumber { get; set; } = null!;
+    public string SellerAccountNumber { get; set; } = null!;
+    public string ContractNumber { get; set; } = null!;
+    public List<string> ContractNumbers { get; set; } = new();
     public int ReplacementCount { get; set; }
     public string? TopProductId { get; set; }
     public int TopScore { get; set; }
     public long PythonResponseMs { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
