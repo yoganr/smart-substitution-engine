@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     mongo_uri: str = ""  # mongodb+srv://...  (keep real creds in .env, never in code)
     mongo_db: str = "hackathon_db"
 
+    # --- Local catalog via .NET backend HTTP API ---
+    # The .NET backend proxies the local MongoDB (which runs MongoDB 3.6, incompatible
+    # with PyMongo 4.x). When set, the chatbot calls /catalog/* endpoints instead.
+    catalog_backend_url: str = ""   # e.g. http://backend:8080
+    local_mongo_contracts: str = "" # comma-separated contract numbers (e.g. "1405,1396")
+
     # --- Feature toggles ---
     enable_embeddings: bool = True
     enable_llm_explanations: bool = True

@@ -138,9 +138,12 @@ services:
       - SSE_ENABLE_MILVUS=true
       - SSE_MILVUS_URI=http://milvus:19530
       - SSE_MILVUS_COLLECTION=product_embeddings
-      # Direct Atlas access powers the chatbot's catalog lookups (same
-      # connection string the .NET backend uses). Empty -> chat catalog features
-      # degrade gracefully; the rest of the service is unaffected.
+      # Local catalog via .NET backend (proxies the real MongoDB catalog).
+      # The local MongoDB runs 3.6 which PyMongo 4.x can't connect to directly,
+      # so the AI service calls the .NET /catalog/* endpoints instead.
+      - SSE_CATALOG_BACKEND_URL=http://backend:8080
+      - SSE_LOCAL_MONGO_CONTRACTS=${LOCAL_MONGODB_CONTRACTS:-1405,1396}
+      # Atlas fallback (legacy hackathon DB — used only when catalog_backend_url is absent)
       - SSE_MONGO_URI=${MONGODB_CONNECTION_STRING}
       - SSE_MONGO_DB=hackathon_db
       - HF_HOME=/cache/huggingface

@@ -20,6 +20,7 @@ from app import __version__
 from app.chat import build_chat_service
 from app.config import get_settings
 from app.engine import build_engine
+from app.local_catalog import build_local_catalog_repo
 from app.logging_config import configure_logging, get_logger
 from app.mongo import build_mongo_repo
 from app.providers import probe_ollama
@@ -73,11 +74,17 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
     app.state.engine = build_engine(settings)
-    app.state.mongo_repo = build_mongo_repo(settings)
+    # Prefer local catalog (real CatalogProduct schema) over Atlas hackathon DB
+    app.state.mongo_repo = build_local_catalog_repo(settings) or build_mongo_repo(settings)
     app.state.chat = build_chat_service(settings, app.state.engine, app.state.mongo_repo)
     engine = app.state.engine
+    catalog_source = (
+        "http-backend" if settings.catalog_backend_url else
+        "atlas" if settings.mongo_uri else
+        "off"
+    )
     logger.info(
-        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s, milvus=%s, atlas=%s)",
+        "%s v%s ready (chat_model=%s, embeddings=%s:%s on %s, llm=%s, milvus=%s, catalog=%s)",
         settings.service_name,
         __version__,
         settings.chat_model,
@@ -86,7 +93,7 @@ async def lifespan(app: FastAPI):
         engine.similarity.embedding_device or "n/a",
         settings.enable_llm_explanations,
         "up" if engine.similarity.uses_milvus else "off",
-        "on" if app.state.mongo_repo else "off",
+        catalog_source,
     )
     yield
     logger.info("Shutting down %s.", settings.service_name)
