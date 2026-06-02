@@ -3,7 +3,7 @@
 These mirror the fields the C# ``PythonReplacementResponseDto`` /
 ``PythonReplacementDto`` / ``PythonRejectedCandidateDto`` records deserialize
 (see backend/SmartSubstitution.Api/Dtos/PythonAiDtos.cs). If any of these break,
-the .NET side silently gets nulls/zeros — so we assert them explicitly.
+the .NET side silently gets nulls/zeros - so we assert them explicitly.
 """
 
 from __future__ import annotations

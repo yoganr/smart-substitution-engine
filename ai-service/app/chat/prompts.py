@@ -1,6 +1,6 @@
 """LLM prompts for the chat layer.
 
-Kept short and strict — the live model is a small ``qwen3.5:0.8b``. The LLM only
+Kept short and strict - the live model is a small ``qwen3.5:0.8b``. The LLM only
 (a) disambiguates intent for messages the deterministic router is unsure about,
 and (b) writes a one-line, fact-grounded intro for results. It never picks
 replacements or invents numbers.

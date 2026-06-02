@@ -3,7 +3,7 @@
 A single LLM **orchestrator** (``router.Orchestrator``) classifies each user turn
 and dispatches to small specialist **agents** (``agents.Agents``) wired together
 as a LangGraph state machine (``graph.build_chat_graph``). The agents reuse the
-existing deterministic recommendation engine and Atlas catalog — the LLM only
+existing deterministic recommendation engine and Atlas catalog - the LLM only
 routes and phrases, it never invents data or chooses replacements.
 """
 

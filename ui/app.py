@@ -1,7 +1,7 @@
-"""Smart Substitution Engine — demo UI (Streamlit).
+"""Smart Substitution Engine - demo UI (Streamlit).
 
 Talks directly to the AI service (default http://localhost:8000) so it is fully
-self-contained — no database or .NET backend needed for the demo.
+self-contained - no database or .NET backend needed for the demo.
 
 Run locally:
     cd ui
@@ -42,7 +42,7 @@ DIMENSIONS = [
 # Demo data
 # --------------------------------------------------------------------------- #
 PRESETS: dict[str, dict] = {
-    "Chicken Breast — out of stock": {
+    "Chicken Breast - out of stock": {
         "requested": {
             "id": "product_001", "name": "Chicken Breast 2kg", "category_id": "chicken",
             "brand": "Brand A", "unit": "kg", "pack_size": 2.0, "base_price": 10.0,
@@ -68,7 +68,7 @@ PRESETS: dict[str, dict] = {
              "dietary_tags": ""},
         ],
     },
-    "Halal request — allergen filter blocks pork": {
+    "Halal request - allergen filter blocks pork": {
         "requested": {
             "id": "product_010", "name": "Beef Mince 1kg", "category_id": "beef",
             "brand": "Brand A", "unit": "kg", "pack_size": 1.0, "base_price": 12.0,
@@ -148,7 +148,7 @@ def build_css(dark: bool) -> str:
     """Return the full <style> block for the chosen theme.
 
     Every colour is driven by a CSS variable, so flipping ``dark`` re-themes the
-    whole app in one shot — the custom cards AND the native Streamlit shell
+    whole app in one shot - the custom cards AND the native Streamlit shell
     (sidebar, inputs, selects, tabs, expanders, secondary buttons).
     """
     if dark:
@@ -178,7 +178,7 @@ def build_css(dark: bool) -> str:
   }}
 
   /* hide developer chrome */
-  /* Hide developer chrome. IMPORTANT: do NOT hide the whole stToolbar — the
+  /* Hide developer chrome. IMPORTANT: do NOT hide the whole stToolbar - the
      collapsed-sidebar expand ( » ) button lives inside it, so hiding the toolbar
      leaves no way to reopen the sidebar once collapsed. Hide only the deploy /
      status / decoration bits and keep the toolbar itself. */
@@ -253,7 +253,7 @@ def build_css(dark: bool) -> str:
   .bar-row {{ display:flex; align-items:center; gap:10px; margin:5px 0; font-size:.78rem; }}
   .bar-label {{ flex:0 0 78px; color:var(--muted); }}
   .bar-track {{ flex:1; height:7px; background:var(--track); border-radius:5px; overflow:hidden; }}
-  .bar-fill {{ height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
+  .bar-fill {{ display:block; height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
   .bar-val {{ flex:0 0 46px; text-align:right; color:var(--body); font-variant-numeric:tabular-nums; }}
 
   .expl {{ margin-top:13px; background:var(--expl); border-left:3px solid #2563eb; border-radius:8px;
@@ -265,7 +265,7 @@ def build_css(dark: bool) -> str:
   .hit-main {{ flex:1; min-width:0; }}
   .hit-name {{ font-weight:600; color:var(--text); }}
   .hit-track {{ flex:0 0 150px; height:7px; background:var(--track); border-radius:5px; overflow:hidden; }}
-  .hit-fill {{ height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
+  .hit-fill {{ display:block; height:100%; background:linear-gradient(90deg,#6366f1,#2563eb); border-radius:5px; }}
   .hit-score {{ flex:0 0 44px; text-align:right; font-weight:700; color:var(--body); font-variant-numeric:tabular-nums; }}
 
   /* empty state */
@@ -368,7 +368,7 @@ with st.sidebar:
         emb = health.get("embeddings", {})
         vs = health.get("vector_store", {})
         ai_ready = health.get("ollama", {}).get("reachable")
-        idx = vs.get("indexed_products", 0) if vs.get("available") else "—"
+        idx = vs.get("indexed_products", 0) if vs.get("available") else "-"
         rows = [
             ("on", "Service online"),
             ("on" if ai_ready else "off", "AI explanations" + ("" if ai_ready else " · standard")),
@@ -393,7 +393,7 @@ with st.sidebar:
 tab_reco, tab_search = st.tabs(["Replacements", "Similar products"])
 
 # =========================================================================== #
-# Tab 1 — Replacements
+# Tab 1 - Replacements
 # =========================================================================== #
 with tab_reco:
     preset_name = st.selectbox("Scenario", list(PRESETS), key="preset")
@@ -501,16 +501,16 @@ with tab_reco:
             with st.expander(f"Not recommended ({len(rejected)})"):
                 for rc in rejected:
                     st.markdown(
-                        f'**{rc["name"]}** — <span style="color:#b91c1c">{rc["rejection_reason"]}</span>',
+                        f'**{rc["name"]}** - <span style="color:#b91c1c">{rc["rejection_reason"]}</span>',
                         unsafe_allow_html=True,
                     )
 
 # =========================================================================== #
-# Tab 2 — Similar products
+# Tab 2 - Similar products
 # =========================================================================== #
 with tab_search:
     st.markdown('<div class="sec">Find similar products</div>', unsafe_allow_html=True)
-    st.caption("Search the catalog by meaning, not just keywords — great for discovering substitutes.")
+    st.caption("Search the catalog by meaning, not just keywords - great for discovering substitutes.")
 
     if st.button("📥 Load sample catalog", use_container_width=True):
         with st.spinner("Loading catalog…"):
@@ -519,7 +519,7 @@ with tab_search:
             st.session_state.pop("_health", None)
             st.success(f"Loaded {data['indexed']} products into the search index.")
         else:
-            st.error("Couldn't load the catalog — the search service is unavailable.")
+            st.error("Couldn't load the catalog - the search service is unavailable.")
 
     q1, q2, q3 = st.columns([3, 2, 1])
     query = q1.text_input("Search for", "Chicken Breast 2kg")
@@ -540,11 +540,11 @@ with tab_search:
         st.markdown('<div class="empty"><div class="big">🔎</div>Load the sample catalog, then search '
                     'for a product to see the closest matches.</div>', unsafe_allow_html=True)
     elif not search["ok"]:
-        st.error("Search is unavailable — load the sample catalog first.")
+        st.error("Search is unavailable - load the sample catalog first.")
     else:
         hits = search["data"].get("results", [])
         if not hits:
-            st.markdown('<div class="empty"><div class="big">🤷</div>No matches found — '
+            st.markdown('<div class="empty"><div class="big">🤷</div>No matches found - '
                         'load the sample catalog first.</div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="card">' + "".join(render_hit(h) for h in hits) + '</div>',
@@ -573,7 +573,7 @@ st.components.v1.html(
       if (doc.getElementById('sse-chat-widget')) return;          // already mounted
       if (!doc.getElementById('sse-chat-loader')) inject();        // first load (let it finish)
       // ONE delayed retry only if the widget never appeared (e.g. AI service was
-      // still warming up). No tight loop — so a slow load is never interrupted.
+      // still warming up). No tight loop - so a slow load is never interrupted.
       setTimeout(function () {{
         if (doc.getElementById('sse-chat-widget')) return;
         var old = doc.getElementById('sse-chat-loader'); if (old) old.remove();

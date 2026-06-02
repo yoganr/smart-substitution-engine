@@ -13,7 +13,7 @@ try {
     Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 3 | Out-Null
     Write-Host "Ollama is reachable." -ForegroundColor Green
 } catch {
-    Write-Host "WARNING: Ollama not reachable at localhost:11434 — explanations will use the template fallback." -ForegroundColor Yellow
+    Write-Host "WARNING: Ollama not reachable at localhost:11434 - explanations will use the template fallback." -ForegroundColor Yellow
 }
 
 $reload = if ($NoReload) { "" } else { "--reload" }

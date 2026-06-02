@@ -1,4 +1,4 @@
-"""ChatService — the facade the API calls: one message in, one answer out.
+"""ChatService - the facade the API calls: one message in, one answer out.
 
 It owns the compiled graph + per-session memory, mints a session id on the first
 turn, and degrades gracefully if a turn blows up. The LLM router uses the SAME
@@ -42,7 +42,7 @@ class ChatService:
             logger.exception("Chat graph failed for session %s", sid)
             return ChatResponse(
                 session_id=sid,
-                reply="Sorry — something went wrong on my side. Please try again.",
+                reply="Sorry - something went wrong on my side. Please try again.",
                 suggestions=["What can you do?"],
                 intent="guide",
             )

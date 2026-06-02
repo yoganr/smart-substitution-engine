@@ -61,7 +61,7 @@ short, human-friendly explanation with a local **Ollama** LLM.
 | Stock availability | 10 |
 | Unit / pack similarity | 8 |
 
-The LLM **never** chooses replacements — Python ranks them deterministically and
+The LLM **never** chooses replacements - Python ranks them deterministically and
 Ollama only explains the result *after* ranking. If Ollama is unavailable, a
 deterministic template explanation is used instead.
 """
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Smart Substitution Engine — AI Service",
+    title="Smart Substitution Engine - AI Service",
     version=__version__,
     description=DESCRIPTION,
     lifespan=lifespan,

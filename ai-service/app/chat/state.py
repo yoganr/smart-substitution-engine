@@ -11,7 +11,7 @@ INTENT_GUIDE = "guide"
 INTENT_FIND_REPLACEMENT = "find_replacement"
 INTENT_SIMILAR = "similar_search"
 INTENT_PRODUCT_INFO = "product_info"
-INTENT_STOCK_OVERVIEW = "stock_overview"   # "what's out of stock?" — lists OOS items
+INTENT_STOCK_OVERVIEW = "stock_overview"   # "what's out of stock?" - lists OOS items
 INTENT_OFF_TOPIC = "off_topic"
 
 ALL_INTENTS = frozenset(

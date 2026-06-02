@@ -4,12 +4,12 @@
 Companion to ``ingest_data.py``: instead of the small fixed demo catalog, this
 procedurally generates hundreds/thousands of varied products (many categories,
 brands, descriptors, units, pack sizes, prices, dietary tags, stock levels),
-plus companies, contracts and inventory — so the recommendation engine has a
+plus companies, contracts and inventory - so the recommendation engine has a
 rich, realistic dataset to work with.
 
 It reuses ``ingest_data.py``'s connection + schema helpers, so the MongoDB
 documents (PascalCase, matched to the .NET models) and Milvus vectors are
-identical in shape to the demo seed — the .NET backend + ai-service consume the
+identical in shape to the demo seed - the .NET backend + ai-service consume the
 generated data with no changes. Run it from the repo root:
 
     python generate_data.py                    # 2000 products, 50 companies -> Mongo + Milvus
@@ -39,7 +39,7 @@ import ingest_data as seed  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Variety pools — category -> (base items, baseline dietary tags, price range)
+# Variety pools - category -> (base items, baseline dietary tags, price range)
 # ---------------------------------------------------------------------------
 CATEGORIES: dict[str, tuple[list[str], list[str], tuple[float, float]]] = {
     "chicken":       (["Chicken Breast", "Chicken Thigh", "Chicken Wing", "Chicken Drumstick", "Whole Chicken", "Chicken Mince", "Chicken Fillet", "Chicken Tenders"], ["halal"], (6, 14)),

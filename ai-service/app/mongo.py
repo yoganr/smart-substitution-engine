@@ -11,7 +11,7 @@ It reads the **PascalCase** field names the .NET MongoDB driver writes
 backend's ``RecommendationController`` + ``CandidateProductService``.
 
 pymongo is synchronous, so every call runs in a worker thread to keep the async
-event loop free — the same pattern the Milvus wrapper uses.
+event loop free - the same pattern the Milvus wrapper uses.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Collection names — must match the .NET backend (RecommendationController.cs).
+# Collection names - must match the .NET backend (RecommendationController.cs).
 COMPANIES = "companies"
 PRODUCTS = "products"
 CONTRACTS = "contracts"

@@ -1,4 +1,4 @@
-"""Hard filters — eliminate ineligible candidates before scoring.
+"""Hard filters - eliminate ineligible candidates before scoring.
 
 Implements the rules from HACKATHON.md:
 

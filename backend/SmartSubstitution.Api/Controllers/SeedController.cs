@@ -12,7 +12,7 @@ public class SeedController : ControllerBase
 
     public SeedController(IMongoDatabase db) => _db = db;
 
-    /// <summary>POST /seed — wipe and re-seed all demo collections</summary>
+    /// <summary>POST /seed - wipe and re-seed all demo collections</summary>
     [HttpPost]
     public async Task<IActionResult> Seed(CancellationToken ct)
     {

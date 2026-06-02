@@ -2,7 +2,7 @@
 
 Strategy is a **hybrid** so it stays reliable on a tiny LLM:
 
-1. If we're mid-flow (a slot is pending), treat the message as the answer —
+1. If we're mid-flow (a slot is pending), treat the message as the answer -
    unless it clearly changes the subject.
 2. Deterministic keyword routing handles the common, unambiguous cases with no
    LLM round-trip (fast).
@@ -75,7 +75,7 @@ CANCEL_WORDS = {
     "cancel", "never mind", "nevermind", "stop", "quit", "exit", "forget it",
     "start over", "reset",
 }
-# "What's out of stock?" — a listing question, NOT a specific-product replacement.
+# "What's out of stock?" - a listing question, NOT a specific-product replacement.
 _OOS_TRIGGERS = (
     "out of stock", "out-of-stock", "outofstock", "sold out", "soldout",
     "unavailable", "low stock", "low on stock", "running low", "depleted",
@@ -118,7 +118,7 @@ _TRAILING_INFO = re.compile(
     r"(\s+(in\s+stock|available|on\s+hand|left|on\s+the\s+shelf)|('?s)?\s+(price|cost|stock|availability|details?|info))\s*\??$",
     re.IGNORECASE,
 )
-# Only treat a trailing "…, I need 20" as a quantity clause when a NUMBER follows —
+# Only treat a trailing "…, I need 20" as a quantity clause when a NUMBER follows -
 # otherwise "…, I want boiled chicken" would be wrongly truncated to nothing.
 _TRAILING_QTY = re.compile(
     r"[,;:]?\s*(please\s*)?(i\s*(need|want|require|will take)|need|want|require|order|buy|qty|quantity)\s+\d+\b.*$",
@@ -160,7 +160,7 @@ class Orchestrator:
         if low.strip(" .!?") in CANCEL_WORDS:
             return self._result(INTENT_GUIDE, slots, clear_pending(context))
 
-        # 0b. "What's out of stock?" — a listing query. Checked early so the
+        # 0b. "What's out of stock?" - a listing query. Checked early so the
         # "out of stock" phrase doesn't get routed to a specific-product replacement.
         if self._is_stock_overview(low):
             return self._result(INTENT_STOCK_OVERVIEW, slots, clear_pending(context))

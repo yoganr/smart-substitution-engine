@@ -10,7 +10,7 @@
 #   ai-service             - FastAPI + LangGraph + sentence-transformers (bge-m3, CPU)
 #   ui                     - Streamlit demo UI       -> http://localhost:8501
 #
-# The .NET backend (other engineer) is NOT included here — it calls this service
+# The .NET backend (other engineer) is NOT included here - it calls this service
 # at http://localhost:8000 (see INTEGRATION.md). Heavy stack (~6GB RAM); the
 # first start downloads models + images.
 # =============================================================================

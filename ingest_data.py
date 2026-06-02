@@ -1,15 +1,15 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 """Seed / reset tool for the Smart Substitution Engine data stores.
 
 A single self-contained script that ingests a demo catalog into **both** data
 stores the system uses:
 
-* **MongoDB Atlas** — the database owned by ``backend/SmartSubstitution.Api``
+* **MongoDB Atlas** - the database owned by ``backend/SmartSubstitution.Api``
   (collections: ``products``, ``companies``, ``contracts``, ``inventory``).
   Documents are written with the *PascalCase* field names the .NET MongoDB
   driver expects (e.g. ``ProductId``, ``CategoryId``, ``IsActive``), so the
   backend deserializes them without any custom convention.
-* **Milvus** — the ``product_embeddings`` vector collection used by
+* **Milvus** - the ``product_embeddings`` vector collection used by
   ``ai-service``. The schema, embedding model (``BAAI/bge-m3``), embedding text
   (``"<name> <category_id>"``) and COSINE metric mirror
   ``ai-service/app/vectorstore.py`` exactly, so the running AI service finds a
@@ -78,7 +78,7 @@ from typing import Any, Optional
 # Defaults (mirror ai-service/app/config.py and backend appsettings.json)
 # ---------------------------------------------------------------------------
 # Defaults to the LOCAL Docker MongoDB. The Atlas URI (when used) lives in
-# ai-service/.env (SSE_MONGO_URI) — gitignored — which this script auto-loads.
+# ai-service/.env (SSE_MONGO_URI) - gitignored - which this script auto-loads.
 # Override per run with --mongo-uri or the MONGODB_URI / SSE_MONGO_URI env var.
 DEFAULT_MONGO_URI = "mongodb://localhost:27017"
 DEFAULT_DB = "hackathon_db"
@@ -88,7 +88,7 @@ DEFAULT_COLLECTION = "product_embeddings"
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
 DEFAULT_EMBEDDING_DIM = 1024
 
-# MongoDB collection names — must match RecommendationController.cs / MongoIndexes.cs
+# MongoDB collection names - must match RecommendationController.cs / MongoIndexes.cs
 COLL_PRODUCTS = "products"
 COLL_COMPANIES = "companies"
 COLL_CONTRACTS = "contracts"
@@ -162,7 +162,7 @@ DEFAULT_DATASET: dict[str, list[dict[str, Any]]] = {
 
 
 # ---------------------------------------------------------------------------
-# Small console helpers (ASCII only — safe on Windows cp1252 consoles)
+# Small console helpers (ASCII only - safe on Windows cp1252 consoles)
 # ---------------------------------------------------------------------------
 def info(msg: str) -> None:
     print(f"[*] {msg}")
@@ -426,7 +426,7 @@ def ingest_milvus(client, collection: str, model, dataset: dict, dim_override: O
 # ---------------------------------------------------------------------------
 def load_dotenv() -> None:
     """Lightweight .env loader (no dependency): populate os.environ from the
-    first .env found among CWD, this script's dir, and ai-service/ — without
+    first .env found among CWD, this script's dir, and ai-service/ - without
     overwriting variables already set in the real environment."""
     here = Path(__file__).resolve().parent
     for path in (Path.cwd() / ".env", here / ".env", here / "ai-service" / ".env"):

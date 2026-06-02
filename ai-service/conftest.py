@@ -1,4 +1,4 @@
-"""Root conftest — ensures the project root is importable and shares fixtures."""
+"""Root conftest - ensures the project root is importable and shares fixtures."""
 
 from __future__ import annotations
 

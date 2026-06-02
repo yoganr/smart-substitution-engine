@@ -2,7 +2,7 @@
 
 These adapters implement the ``EmbeddingsProvider`` / ``ChatProvider`` protocols
 consumed by the service layer. Construction is lazy (no network call), so a
-provider object can be created even when Ollama is down — failures surface at
+provider object can be created even when Ollama is down - failures surface at
 call time and are handled by the service layer's fallbacks.
 """
 

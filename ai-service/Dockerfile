@@ -1,5 +1,5 @@
 # =============================================================================
-# Python AI Recommendation Service — multi-stage image (CPU PyTorch)
+# Python AI Recommendation Service - multi-stage image (CPU PyTorch)
 #
 #   Embeddings : sentence-transformers + BAAI/bge-m3  (runs in-container, CPU)
 #   Generation : Ollama qwen3.5:0.8b                  (separate container)

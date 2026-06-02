@@ -81,9 +81,9 @@ def unit_pack_factor(requested: RequestedProduct, candidate: CandidateProduct) -
     cand_unit = (candidate.unit or "").strip().lower()
 
     if not req_unit or not cand_unit:
-        return 0.6  # unknown unit on either side — neutral-positive
+        return 0.6  # unknown unit on either side - neutral-positive
     if req_unit != cand_unit:
-        return 0.0  # different unit of measure — not directly comparable
+        return 0.0  # different unit of measure - not directly comparable
 
     if requested.pack_size is None or candidate.pack_size is None:
         return 0.8  # same unit, unknown pack size

@@ -1,5 +1,5 @@
 /*!
- * Smart Substitution Engine — floating chat widget (dependency-free).
+ * Smart Substitution Engine - floating chat widget (dependency-free).
  *
  * Drop-in: <script src="http://localhost:8000/chat/static/widget.js" data-api="http://localhost:8000"></script>
  * Renders a bottom-right launcher that opens a chat panel (in a Shadow DOM, so
@@ -47,7 +47,7 @@
   };
   var WELCOME =
     "👋 Hi! I'm your **Substitution Assistant**. When a product is " +
-    "out of stock, I find the best alternatives for you — no forms, just ask.";
+    "out of stock, I find the best alternatives for you - no forms, just ask.";
   var WELCOME_SUGGESTIONS = [
     "Find a replacement for Chicken Breast 2kg",
     "Show similar products to Beef Mince",
@@ -266,7 +266,7 @@
     }
     if (c.type === "product") {
       var inStock = num(c.stock_quantity) != null && c.stock_quantity > 0;
-      var price = num(c.base_price) != null ? c.base_price.toFixed(2) + "/" + (c.unit || "unit") : "—";
+      var price = num(c.base_price) != null ? c.base_price.toFixed(2) + "/" + (c.unit || "unit") : "-";
       return (
         '<div class="sse-card prod"><div class="sse-cname">' + esc(c.name) +
         (c.category_id ? ' <span class="sse-tag">' + esc(c.category_id) + "</span>" : "") + "</div>" +

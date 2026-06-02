@@ -2,7 +2,7 @@
 
 Deliberately simple: a dict keyed by ``session_id`` holding a bounded message
 history plus a small ``WorkingContext`` (resolved product, company, pending
-slot). Single-process only — swap for Redis/Mongo if the service is scaled out.
+slot). Single-process only - swap for Redis/Mongo if the service is scaled out.
 """
 
 from __future__ import annotations

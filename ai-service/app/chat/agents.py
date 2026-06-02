@@ -1,4 +1,4 @@
-"""Specialist agents — the LangGraph nodes the orchestrator dispatches to.
+"""Specialist agents - the LangGraph nodes the orchestrator dispatches to.
 
 Each agent takes the graph ``state`` and returns the turn's answer
 (``reply`` + ``suggestions`` + ``cards`` + updated ``context``). They reuse the
@@ -51,7 +51,7 @@ _STOPWORDS = {
     "no", "nope", "nah", "none", "not", "actually", "instead", "rather", "well",
     "and", "or", "with", "that", "this", "it", "one", "ones", "item", "items",
     "product", "products", "thanks", "thank", "ok", "okay", "yes", "yeah", "sure",
-    # query / command words — never product attributes
+    # query / command words - never product attributes
     "check", "how", "many", "much", "still", "left", "right", "now", "currently",
     "there", "which", "what", "whats", "level", "levels", "count", "available",
     "availability", "price", "cost", "running", "low", "out", "depleted",
@@ -81,7 +81,7 @@ class Agents:
         lead = "👋 Hi! I'm your **Substitution Assistant**." if greeted else "Here's how I can help. 👇"
         reply = (
             f"{lead}\n\n"
-            "When a product is **out of stock**, I find the best alternatives for you — "
+            "When a product is **out of stock**, I find the best alternatives for you - "
             "no forms, just ask. I can:\n\n"
             "• 🔁 **Find a replacement** for an out-of-stock product\n"
             "• 🔍 **Show similar products** in the catalog\n"
@@ -101,7 +101,7 @@ class Agents:
         reply = (
             "I'm the **Substitution Assistant** for this product catalog, so I can only help with "
             "**product substitutions, similar products, and stock or pricing**. "
-            "I'm not able to help with that — but I'd be glad to find you a replacement or alternative."
+            "I'm not able to help with that - but I'd be glad to find you a replacement or alternative."
         )
         suggestions = ["Find a replacement", "Show similar products", "What can you do?"]
         return self._answer(reply, suggestions, [], context)
@@ -135,7 +135,7 @@ class Agents:
         stock = await self._repo.get_stock(product["id"])
         if stock is not None and stock >= qty:
             reply = (
-                f"✅ **{name}** is currently in stock — {int(stock)} available "
+                f"✅ **{name}** is currently in stock - {int(stock)} available "
                 f"(you need {int(qty)}), so no replacement is required."
             )
             suggestions = [f"Show similar products to {name}", "Check another product"]
@@ -161,7 +161,7 @@ class Agents:
         except Exception:  # pragma: no cover - live engine/Atlas failure path
             logger.warning("Substitution failed for %s", product.get("id"), exc_info=True)
             return self._answer(
-                "Sorry — I hit a problem while looking up replacements. Please try again.",
+                "Sorry - I hit a problem while looking up replacements. Please try again.",
                 ["What can you do?"], [], context,
             )
 
@@ -175,10 +175,10 @@ class Agents:
         cards = [self._replacement_card(r, i, product.get("category_id")) for i, r in enumerate(reps, 1)]
         top = reps[0]
         plural = "s" if len(reps) > 1 else ""
-        note = "" if explicit_qty else f" _(assuming {int(qty)} units — tell me the exact amount to refine.)_"
+        note = "" if explicit_qty else f" _(assuming {int(qty)} units - tell me the exact amount to refine.)_"
         reply = (
             f"**{name}** is short on stock. Here {'are' if len(reps) > 1 else 'is'} the top "
-            f"{len(reps)} replacement{plural} — **{top.name}** leads at **{top.confidence_pct}% "
+            f"{len(reps)} replacement{plural} - **{top.name}** leads at **{top.confidence_pct}% "
             f"confidence**.{note}"
         )
         suggestions = [
@@ -267,7 +267,7 @@ class Agents:
             context["last_product"] = product
             context.pop("disamb_ids", None)
             return await self._single_product_info(product, context)
-        # A broad query (e.g. "chicken") matches several products — for a stock /
+        # A broad query (e.g. "chicken") matches several products - for a stock /
         # price question, summarise them ALL at once rather than asking to pick one.
         if disambig:
             return await self._stock_summary(query, context)
@@ -282,7 +282,7 @@ class Agents:
         status = "✅ in stock" if in_stock else "⚠️ out of stock"
         price_txt = f"{price:.2f}/{unit}" if isinstance(price, (int, float)) else "price unavailable"
         stock_txt = f"{int(stock)} available" if stock is not None else "stock unknown"
-        reply = f"**{name}** — {status}. Price {price_txt}, {stock_txt}."
+        reply = f"**{name}** - {status}. Price {price_txt}, {stock_txt}."
         card = self._product_card(product, stock)
         if in_stock:
             suggestions = [f"Show similar products to {name}", "Check another product"]
@@ -308,7 +308,7 @@ class Agents:
         # Display the meaningful part of the query (drop filler like "still").
         display = " ".join(t for t in query.split() if t.lower() not in _STOPWORDS) or query
         reply = (
-            f'Here\'s the stock for the **{len(ranked)}** closest matches to **"{display}"** — '
+            f'Here\'s the stock for the **{len(ranked)}** closest matches to **"{display}"** - '
             f"{in_stock} in stock, {out} out of stock:"
         )
         suggestions = [f"Find a replacement for {ranked[0].get('name', '')}", "Check another product", "What's out of stock?"]
@@ -324,12 +324,12 @@ class Agents:
         except Exception:  # pragma: no cover - live Atlas failure path
             logger.warning("Out-of-stock lookup failed.", exc_info=True)
             return self._answer(
-                "Sorry — I couldn't check stock levels just now. Please try again.",
+                "Sorry - I couldn't check stock levels just now. Please try again.",
                 ["What can you do?"], [], context,
             )
         if not rows:
             return self._answer(
-                "Good news — every active product in the catalog is currently **in stock**. 🎉",
+                "Good news - every active product in the catalog is currently **in stock**. 🎉",
                 ["Find a replacement", "Show similar products", "Check stock for a product"],
                 [], context,
             )
@@ -432,11 +432,11 @@ class Agents:
             note = f"I don't stock a **{unmatched[0]}** option specifically. " if unmatched else ""
             if repeated or is_rejection or unmatched:
                 reply = (
-                    f"{note}Here are the closest products I have — **tap one** below "
+                    f"{note}Here are the closest products I have - **tap one** below "
                     f"or type its exact name:\n\n{lines}"
                 )
             else:
-                reply = f"I found a few matches — which one did you mean?\n\n{lines}"
+                reply = f"I found a few matches - which one did you mean?\n\n{lines}"
             suggestions = [d.get("name") for d in disambig][:4]
             return self._answer(reply, suggestions, [], context)
 
@@ -446,14 +446,14 @@ class Agents:
         context.pop("disamb_ids", None)
         verb = _INTENT_VERB.get(intent, "look up")
         if is_rejection:
-            reply = "No problem — just tell me the product name you have in mind and I'll take it from there."
+            reply = "No problem - just tell me the product name you have in mind and I'll take it from there."
         elif query:
             reply = (
                 f'I couldn\'t find a product matching **"{query}"** in the catalog. '
                 "Try the exact product name, or pick one below."
             )
         else:
-            reply = f"Sure — which product would you like to {verb}?"
+            reply = f"Sure - which product would you like to {verb}?"
         suggestions = ["Chicken Breast 2kg", "Beef Mince 5% Fat 1kg", "What can you do?"]
         return self._answer(reply, suggestions, [], context)
 

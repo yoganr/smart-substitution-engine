@@ -1,6 +1,6 @@
 """Natural-language explanations for ranked replacements.
 
-Per the MVP rule, the LLM does *not* choose replacements — Python ranks them
+Per the MVP rule, the LLM does *not* choose replacements - Python ranks them
 deterministically, and Ollama only writes a short, human-friendly justification
 *after* ranking. The model is fed verified facts only (never asked to invent
 numbers) to keep explanations grounded. If Ollama is disabled or unavailable, a
@@ -25,7 +25,7 @@ SYSTEM_PROMPT = (
     "You are a procurement assistant for a B2B food-supply platform. A requested "
     "product is unavailable and the system has already chosen a replacement using "
     "deterministic scoring. Write ONE concise sentence (max 30 words) explaining why "
-    "the replacement is a good fit. Use ONLY the facts provided — never invent prices, "
+    "the replacement is a good fit. Use ONLY the facts provided - never invent prices, "
     "brands, or numbers. Be factual and business-like. No markdown, no preamble."
 )
 

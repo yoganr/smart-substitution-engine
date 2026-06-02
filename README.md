@@ -14,7 +14,7 @@ This is a monorepo with three parts:
 | [`ui/`](ui/) | Python AI Engineer | Streamlit demo UI (→ AI service) |
 | [`backend/`](backend/) | .NET Engineer | ASP.NET Core · MongoDB Atlas |
 
-The .NET backend calls the Python AI service at `http://localhost:8000` — see
+The .NET backend calls the Python AI service at `http://localhost:8000` - see
 [`INTEGRATION.md`](INTEGRATION.md) for the contract and [`HACKATHON.md`](HACKATHON.md)
 for the full plan. This README documents the **Python AI service** (`ai-service/`).
 
@@ -46,7 +46,7 @@ flowchart TB
     class AI svc;
 ```
 
-> The LLM never picks replacements — Python ranks deterministically and Ollama
+> The LLM never picks replacements - Python ranks deterministically and Ollama
 > only explains. Every external dependency (Ollama, Milvus, embeddings) has a
 > fallback, so the service degrades gracefully instead of failing.
 
@@ -84,22 +84,22 @@ flowchart LR
 - **Semantic similarity** via the BAAI `bge-m3` embedding model (run locally with
   `sentence-transformers`, GPU-accelerated) lets the engine recognise that
   "Chicken Thigh Fillet" is a closer substitute for "Chicken Breast" than "Frozen
-  Carrots" — even across category boundaries — with a deterministic lexical
+  Carrots" - even across category boundaries - with a deterministic lexical
   fallback when embeddings are off.
 - **Milvus vector store**: product embeddings are persisted in a Milvus vector DB
-  (`pymilvus`) — used as an embedding cache in the scoring flow and exposed via
+  (`pymilvus`) - used as an embedding cache in the scoring flow and exposed via
   `POST /index/products` + `POST /search/similar` for catalog-wide ANN retrieval.
   Falls back to in-process embeddings if Milvus is unavailable.
 - **Grounded explanations**: the LLM is fed only verified facts (never asked to
   invent prices/brands), so explanations are trustworthy.
 - **Graceful degradation**: works with Ollama on/off, embeddings on/off, Milvus
-  on/off — every layer has a fallback, so it never crashes.
+  on/off - every layer has a fallback, so it never crashes.
 
 ---
 
 ## Quickstart
 
-### Option A — Docker (self-contained: UI + AI service + Milvus + Ollama)
+### Option A - Docker (self-contained: UI + AI service + Milvus + Ollama)
 
 ```bash
 docker compose up --build
@@ -113,7 +113,7 @@ Brings up the whole stack, auto-pulls `qwen3.5:0.8b`, and serves:
 See [`DOCKER.md`](DOCKER.md) for details. First run downloads the models
 (~minutes); after that it's instant.
 
-### Option B — Local Python
+### Option B - Local Python
 
 ```powershell
 cd ai-service
@@ -122,7 +122,7 @@ cd ai-service
 python -m pip install -r requirements.txt
 
 # 2. Make sure Ollama is running with the chat model pulled
-#    (embeddings run locally via sentence-transformers — BAAI/bge-m3 downloads
+#    (embeddings run locally via sentence-transformers - BAAI/bge-m3 downloads
 #     automatically from HuggingFace on first use)
 ollama serve
 ollama pull qwen3.5:0.8b
@@ -149,10 +149,10 @@ curl -X POST http://localhost:8000/recommendations/replacements `
 A point-and-click UI for demos lives in [`ui/`](ui/). It talks directly to the
 AI service (no MongoDB needed) and has two tabs:
 
-- **🔁 Replacements** — pick a scenario, edit the out-of-stock product + candidate
+- **🔁 Replacements** - pick a scenario, edit the out-of-stock product + candidate
   table, and see ranked replacements with confidence badges, per-dimension score
   bars, Ollama explanations, and the rejected-candidate reasons.
-- **🔍 Vector Search** — index a sample catalog into Milvus and run similarity
+- **🔍 Vector Search** - index a sample catalog into Milvus and run similarity
   search over it.
 
 ```powershell

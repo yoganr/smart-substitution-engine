@@ -14,7 +14,7 @@ builder.Services.Configure<MongoDbSettings>(
 builder.Services.Configure<PythonAiSettings>(
     builder.Configuration.GetSection("PythonAiService"));
 
-// ── MongoDB — Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
+// ── MongoDB - Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
 
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
@@ -60,7 +60,7 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning(ex, "Could not ensure MongoDB indexes — Atlas may not be configured yet");
+        logger.LogWarning(ex, "Could not ensure MongoDB indexes - Atlas may not be configured yet");
     }
 }
 
