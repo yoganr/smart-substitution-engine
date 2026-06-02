@@ -387,7 +387,7 @@ with st.sidebar:
     with st.expander("Advanced"):
         st.session_state.ai_url = st.text_input("Service URL", value=_base_url())
 
-    st.markdown('<div style="color:#94a3b8;font-size:.78rem;margin-top:18px;">Smart Substitution Engine · demo</div>',
+    st.markdown('<div style="color:#94a3b8;font-size:.78rem;margin-top:18px;">Smart Substitution Engine</div>',
                 unsafe_allow_html=True)
 
 tab_reco, tab_search = st.tabs(["Replacements", "Similar products"])
