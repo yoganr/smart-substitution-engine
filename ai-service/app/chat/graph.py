@@ -23,6 +23,7 @@ from app.chat.state import (
     INTENT_OFF_TOPIC,
     INTENT_PRODUCT_INFO,
     INTENT_SIMILAR,
+    INTENT_STOCK_OVERVIEW,
     ChatState,
 )
 
@@ -31,6 +32,7 @@ _ROUTES = {
     INTENT_FIND_REPLACEMENT: "substitution",
     INTENT_SIMILAR: "similar",
     INTENT_PRODUCT_INFO: "product_info",
+    INTENT_STOCK_OVERVIEW: "stock_overview",
     INTENT_OFF_TOPIC: "refusal",
 }
 
@@ -47,11 +49,12 @@ def build_chat_graph(orchestrator, agents):
     graph.add_node("substitution", agents.substitution)
     graph.add_node("similar", agents.similar)
     graph.add_node("product_info", agents.product_info)
+    graph.add_node("stock_overview", agents.stock_overview)
     graph.add_node("refusal", agents.refusal)
 
     graph.add_edge(START, "orchestrate")
     graph.add_conditional_edges("orchestrate", _route, _ROUTES)
-    for node in ("guide", "substitution", "similar", "product_info", "refusal"):
+    for node in ("guide", "substitution", "similar", "product_info", "stock_overview", "refusal"):
         graph.add_edge(node, END)
 
     return graph.compile()

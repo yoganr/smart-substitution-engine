@@ -44,12 +44,18 @@ _INTENT_VERB = {
 _STOPWORDS = {
     "a", "an", "the", "to", "i", "im", "me", "my", "some", "any", "of", "for", "on",
     "is", "are", "do", "you", "we", "have", "has", "want", "wants", "need", "needs",
-    "require", "find", "get", "show", "give", "suggest", "recommend", "look", "search",
+    "require", "find", "get", "give", "suggest", "recommend", "look", "search",
+    "show", "tell", "see", "know", "about",
     "replacement", "replacements", "substitute", "substitutes", "substitution",
     "alternative", "alternatives", "similar", "comparable", "please", "stock", "in",
     "no", "nope", "nah", "none", "not", "actually", "instead", "rather", "well",
     "and", "or", "with", "that", "this", "it", "one", "ones", "item", "items",
     "product", "products", "thanks", "thank", "ok", "okay", "yes", "yeah", "sure",
+    # query / command words — never product attributes
+    "check", "how", "many", "much", "still", "left", "right", "now", "currently",
+    "there", "which", "what", "whats", "level", "levels", "count", "available",
+    "availability", "price", "cost", "running", "low", "out", "depleted",
+    "inventory", "if", "whether", "each", "per", "total", "remaining",
 }
 # Phrases that mean "none of the options you showed me".
 _REJECTIONS = {
@@ -79,12 +85,13 @@ class Agents:
             "no forms, just ask. I can:\n\n"
             "• 🔁 **Find a replacement** for an out-of-stock product\n"
             "• 🔍 **Show similar products** in the catalog\n"
-            "• 📦 **Check stock & price** for any product\n\n"
+            "• 📦 **Check stock & price** for any product\n"
+            "• ⚠️ **List what's out of stock** right now\n\n"
             "Just name a product to get started."
         )
         suggestions = [
             "Find a replacement for Chicken Breast 2kg",
-            "Show similar products to Beef Mince",
+            "What's out of stock right now?",
             "Check stock for Chicken Breast 2kg",
         ]
         return self._answer(reply, suggestions, [], context)
@@ -252,14 +259,21 @@ class Agents:
             return self._answer(_NO_CATALOG, ["What can you do?"], [], context)
 
         query = (slots.get("product") or "").strip()
-        product = context["last_product"] if (not query and context.get("last_product")) else None
-        if product is None:
-            product, disambig = await self._resolve(query)
-            if product is None:
-                return self._ask_product(INTENT_PRODUCT_INFO, query, disambig, context)
-        context["last_product"] = product
-        context.pop("disamb_ids", None)
+        if not query and context.get("last_product"):
+            return await self._single_product_info(context["last_product"], context)
 
+        product, disambig = await self._resolve(query)
+        if product is not None:
+            context["last_product"] = product
+            context.pop("disamb_ids", None)
+            return await self._single_product_info(product, context)
+        # A broad query (e.g. "chicken") matches several products — for a stock /
+        # price question, summarise them ALL at once rather than asking to pick one.
+        if disambig:
+            return await self._stock_summary(query, context)
+        return self._ask_product(INTENT_PRODUCT_INFO, query, [], context)
+
+    async def _single_product_info(self, product: dict, context: dict) -> dict:
         stock = await self._repo.get_stock(product["id"])
         name = product.get("name", "")
         price = product.get("base_price")
@@ -275,6 +289,63 @@ class Agents:
         else:
             suggestions = [f"Find a replacement for {name}", f"Show similar products to {name}"]
         return self._answer(reply, suggestions, [card], context)
+
+    async def _stock_summary(self, query: str, context: dict) -> dict:
+        """Show stock + price for every product matching a broad query."""
+        rows = await self._search_variants(query)
+        ranked, seen = [], set()
+        for r in sorted(rows, key=lambda r: lexical_similarity(query, r.get("name", "")), reverse=True):
+            if r.get("id") in seen:
+                continue
+            seen.add(r.get("id"))
+            ranked.append(r)
+        ranked = ranked[:8]
+        if not ranked:
+            return self._ask_product(INTENT_PRODUCT_INFO, query, [], context)
+        cards = [self._product_card(r, r.get("stock_quantity")) for r in ranked]
+        in_stock = sum(1 for r in ranked if (r.get("stock_quantity") or 0) > 0)
+        out = len(ranked) - in_stock
+        # Display the meaningful part of the query (drop filler like "still").
+        display = " ".join(t for t in query.split() if t.lower() not in _STOPWORDS) or query
+        reply = (
+            f'Here\'s the stock for the **{len(ranked)}** closest matches to **"{display}"** — '
+            f"{in_stock} in stock, {out} out of stock:"
+        )
+        suggestions = [f"Find a replacement for {ranked[0].get('name', '')}", "Check another product", "What's out of stock?"]
+        return self._answer(reply, suggestions, cards, context)
+
+    async def stock_overview(self, state: dict) -> dict:
+        """List the products that are currently out of stock."""
+        context = dict(state.get("context") or {})
+        if self._repo is None:
+            return self._answer(_NO_CATALOG, ["What can you do?"], [], context)
+        try:
+            rows, total = await self._repo.list_out_of_stock_products(limit=6)
+        except Exception:  # pragma: no cover - live Atlas failure path
+            logger.warning("Out-of-stock lookup failed.", exc_info=True)
+            return self._answer(
+                "Sorry — I couldn't check stock levels just now. Please try again.",
+                ["What can you do?"], [], context,
+            )
+        if not rows:
+            return self._answer(
+                "Good news — every active product in the catalog is currently **in stock**. 🎉",
+                ["Find a replacement", "Show similar products", "Check stock for a product"],
+                [], context,
+            )
+        cards = [self._product_card(r, 0) for r in rows]
+        names = [r.get("name", "") for r in rows]
+        tail = f" (showing {len(rows)} of {total})" if total > len(rows) else ""
+        reply = (
+            f"**{total}** product{'s' if total != 1 else ''} "
+            f"{'are' if total != 1 else 'is'} out of stock right now{tail}. "
+            "Tap one to find a replacement:"
+        )
+        suggestions = [f"Find a replacement for {names[0]}"]
+        if len(names) > 1:
+            suggestions.append(f"Find a replacement for {names[1]}")
+        suggestions.append("What can you do?")
+        return self._answer(reply, suggestions[:3], cards, context)
 
     # ====================================================================
     # Helpers

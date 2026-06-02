@@ -178,7 +178,14 @@ def build_css(dark: bool) -> str:
   }}
 
   /* hide developer chrome */
-  [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] {{ display:none !important; }}
+  /* Hide developer chrome. IMPORTANT: do NOT hide the whole stToolbar — the
+     collapsed-sidebar expand ( » ) button lives inside it, so hiding the toolbar
+     leaves no way to reopen the sidebar once collapsed. Hide only the deploy /
+     status / decoration bits and keep the toolbar itself. */
+  [data-testid="stDecoration"], [data-testid="stStatusWidget"] {{ display:none !important; }}
+  [data-testid="stAppDeployButton"], [data-testid="stToolbarActions"] {{ display:none !important; }}
+  /* Header + toolbar follow the theme (no white bar in dark mode). */
+  [data-testid="stHeader"], [data-testid="stToolbar"] {{ background:transparent !important; }}
   #MainMenu, footer {{ visibility:hidden; }}
 
   /* app shell + native surfaces follow the theme */
@@ -553,23 +560,26 @@ st.components.v1.html(
     f"""
     <script>
     (function() {{
-      var doc = window.parent.document;
-      var API = '{AI_PUBLIC_URL}';
-      function ensure() {{
-        if (doc.getElementById('sse-chat-widget')) return;   // already mounted
-        var old = doc.getElementById('sse-chat-loader');
-        if (old) old.remove();
-        try {{ window.parent.__sseChat = null; }} catch (e) {{}}  // allow a fresh mount
+      var doc;
+      try {{ doc = window.parent.document; }} catch (e) {{ return; }}  // cross-origin guard
+      var API = '{AI_PUBLIC_URL}', SRC = API + '/chat/static/widget.js?v=6';
+      function inject() {{
         var s = doc.createElement('script');
         s.id = 'sse-chat-loader';
-        s.src = API + '/chat/static/widget.js?v=2';
+        s.src = SRC;
         s.setAttribute('data-api', API);
         doc.body.appendChild(s);
       }}
-      ensure();
-      // A Streamlit rerun can wipe body children; re-check briefly so the
-      // launcher can never be permanently lost.
-      var n = 0, t = setInterval(function () {{ ensure(); if (++n > 6) clearInterval(t); }}, 700);
+      if (doc.getElementById('sse-chat-widget')) return;          // already mounted
+      if (!doc.getElementById('sse-chat-loader')) inject();        // first load (let it finish)
+      // ONE delayed retry only if the widget never appeared (e.g. AI service was
+      // still warming up). No tight loop — so a slow load is never interrupted.
+      setTimeout(function () {{
+        if (doc.getElementById('sse-chat-widget')) return;
+        var old = doc.getElementById('sse-chat-loader'); if (old) old.remove();
+        try {{ window.parent.__sseChat = null; }} catch (e) {{}}
+        inject();
+      }}, 3000);
     }})();
     </script>
     """,

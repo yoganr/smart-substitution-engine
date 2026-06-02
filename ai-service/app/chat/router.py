@@ -27,6 +27,7 @@ from app.chat.state import (
     INTENT_OFF_TOPIC,
     INTENT_PRODUCT_INFO,
     INTENT_SIMILAR,
+    INTENT_STOCK_OVERVIEW,
     PRODUCT_INTENTS,
     clear_pending,
 )
@@ -74,6 +75,15 @@ CANCEL_WORDS = {
     "cancel", "never mind", "nevermind", "stop", "quit", "exit", "forget it",
     "start over", "reset",
 }
+# "What's out of stock?" — a listing question, NOT a specific-product replacement.
+_OOS_TRIGGERS = (
+    "out of stock", "out-of-stock", "outofstock", "sold out", "soldout",
+    "unavailable", "low stock", "low on stock", "running low", "depleted",
+)
+_OOS_LISTY_STARTS = (
+    "which", "what", "whats", "what's", "list", "show", "any", "anything",
+    "is", "are", "do",
+)
 
 # Lead-in phrases stripped from the front of a message to recover the product.
 _LEADINS = [
@@ -96,6 +106,8 @@ _LEADINS = [
         r"^(is\s+there\s+(any)?|have\s+you\s+got)\s+",
         r"^how\s+much\s+(is|are|does|do)\s*(a|an|the)?\s*",
         r"^how\s+(many|much)\s+(of\s+)?",
+        r"^check\s+(if\s+|whether\s+|how\s+(many|much)\s+)?",
+        r"^(tell|show)\s+me\s+(how\s+(many|much)\s+)?",
         r"^(out of stock|out-of-stock|unavailable|sold out)[:,]?\s+",
         r"^instead of\s+",
         r"^(is|are|was|were)\s+(the\s+)?",
@@ -148,6 +160,11 @@ class Orchestrator:
         if low.strip(" .!?") in CANCEL_WORDS:
             return self._result(INTENT_GUIDE, slots, clear_pending(context))
 
+        # 0b. "What's out of stock?" — a listing query. Checked early so the
+        # "out of stock" phrase doesn't get routed to a specific-product replacement.
+        if self._is_stock_overview(low):
+            return self._result(INTENT_STOCK_OVERVIEW, slots, clear_pending(context))
+
         pending_intent = context.get("pending_intent")
         pending_slot = context.get("pending_slot")
 
@@ -180,7 +197,7 @@ class Orchestrator:
                 slots["product"] = self._extract_product(message, llm.get("product"))
                 slots["quantity"] = slots["quantity"] or llm.get("quantity")
                 return self._result(intent, slots, context)
-            if intent in (INTENT_OFF_TOPIC, INTENT_GUIDE):
+            if intent in (INTENT_OFF_TOPIC, INTENT_GUIDE, INTENT_STOCK_OVERVIEW):
                 return self._result(intent, slots, context)
 
         # 4. Final heuristic.
@@ -241,6 +258,20 @@ class Orchestrator:
         if any(p in low for p in INFO_PHRASES):
             return INTENT_PRODUCT_INFO
         return None
+
+    def _is_stock_overview(self, low: str) -> bool:
+        """True for general "what's out of stock?" questions (no specific product)."""
+        if not any(t in low for t in _OOS_TRIGGERS):
+            return False
+        first = low.split()[0].strip(",.!?") if low.split() else ""
+        if first in ("which", "what", "whats", "what's", "list", "show"):
+            return True
+        listy = (
+            "anything", "everything", "any products", "what products",
+            "which products", "any items", "is there any", "are there any",
+            "do you have any",
+        )
+        return any(p in low for p in listy)
 
     def _off_topic_signal(self, low: str) -> bool:
         tokens = set(re.findall(r"[a-z0-9+]+", low))

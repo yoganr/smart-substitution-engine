@@ -18,6 +18,7 @@ from app.chat.state import (
     INTENT_OFF_TOPIC,
     INTENT_PRODUCT_INFO,
     INTENT_SIMILAR,
+    INTENT_STOCK_OVERVIEW,
 )
 from app.engine import build_engine
 
@@ -66,6 +67,13 @@ class FakeRepo:
     async def list_categories(self):
         return ["cat_beef", "cat_chicken"]
 
+    async def list_out_of_stock_products(self, limit=6):
+        oos = [dict(p) for p in self.products.values() if p["stock_quantity"] <= 0]
+        rows = oos[:limit]
+        for r in rows:
+            r["stock_quantity"] = 0
+        return rows, len(oos)
+
 
 def _p(pid, name, category, price, stock):
     return {
@@ -99,6 +107,10 @@ def service(settings, repo):
         ("what's the weather today?", INTENT_OFF_TOPIC),
         ("tell me a joke", INTENT_OFF_TOPIC),
         ("write me some python code", INTENT_OFF_TOPIC),
+        ("which is out of stock right now?", INTENT_STOCK_OVERVIEW),
+        ("what's out of stock?", INTENT_STOCK_OVERVIEW),
+        ("show me out of stock products", INTENT_STOCK_OVERVIEW),
+        ("chicken breast is out of stock", INTENT_FIND_REPLACEMENT),  # specific product → replacement
     ],
 )
 async def test_orchestrator_routing(settings, repo, message, intent):
@@ -174,6 +186,15 @@ async def test_product_info_returns_a_product_card(service):
     assert resp.cards[0].type == "product"
 
 
+async def test_broad_stock_query_summarises_all_matches(service):
+    # "chicken" matches several products → summarise stock for all, not disambiguate.
+    resp = await service.handle(None, "how many chicken in stock?")
+    assert resp.intent == INTENT_PRODUCT_INFO
+    assert len(resp.cards) >= 2
+    assert all(c.type == "product" for c in resp.cards)
+    assert "which one" not in resp.reply.lower()
+
+
 async def test_cancel_exits_a_pending_flow(service):
     first = await service.handle(None, "I need a replacement")
     assert "which product" in first.reply.lower()
@@ -199,3 +220,19 @@ async def test_disambiguation_acknowledges_unstocked_attribute(service):
     refined = await service.handle(disamb.session_id, "No, I want boiled chicken")
     # Honest about the missing attribute instead of silently repeating the list.
     assert "boiled" in refined.reply.lower()
+
+
+async def test_stock_overview_lists_out_of_stock(service):
+    resp = await service.handle(None, "which is out of stock right now?")
+    assert resp.intent == INTENT_STOCK_OVERVIEW
+    assert resp.cards and all(c.type == "product" for c in resp.cards)
+    assert "out of stock" in resp.reply.lower()
+    assert any(c.name == "Chicken Breast 2kg" for c in resp.cards)  # the OOS item
+
+
+async def test_stock_query_does_not_flag_command_words(service):
+    # "check"/"how"/"many"/"still" must not be treated as missing product attributes.
+    resp = await service.handle(None, "I want check how many still in stock for chicken")
+    assert resp.intent == INTENT_PRODUCT_INFO
+    assert "check option" not in resp.reply.lower()
+    assert "don't stock a check" not in resp.reply.lower()

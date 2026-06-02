@@ -17,6 +17,7 @@ ROUTER_SYSTEM = (
     "- find_replacement: wants a substitute/alternative for an out-of-stock or unavailable product.\n"
     "- similar_search: wants to browse similar or comparable products.\n"
     "- product_info: asks about a specific product's price, stock, or details.\n"
+    "- stock_overview: asks which products are out of stock / a general stock listing (no specific product).\n"
     "- guide: greeting, help, or 'what can you do'.\n"
     "- off_topic: anything NOT about products, substitutions, stock, or this food catalog "
     "(e.g. weather, jokes, coding, general knowledge).\n"

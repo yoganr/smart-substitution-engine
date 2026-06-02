@@ -182,6 +182,39 @@ class MongoCatalogRepository:
             lambda: sorted(c for c in self._db[PRODUCTS].distinct("CategoryId") if c)
         )
 
+    async def list_out_of_stock_products(self, limit: int = 6) -> tuple[list[dict], int]:
+        """Active products whose inventory is depleted (``StockQuantity <= 0``).
+
+        Returns ``(rows, total)`` where ``rows`` is capped at ``limit`` and
+        ``total`` is the full out-of-stock count (so the bot can say "and N more").
+        """
+        return await asyncio.to_thread(self._oos_sync, limit)
+
+    def _oos_sync(self, limit: int) -> tuple[list[dict], int]:
+        oos_ids = [
+            i.get("ProductId")
+            for i in self._db[INVENTORY].find({"StockQuantity": {"$lte": 0}}, {"ProductId": 1})
+            if i.get("ProductId")
+        ]
+        if not oos_ids:
+            return [], 0
+        products = {
+            p["ProductId"]: p
+            for p in self._db[PRODUCTS].find({"ProductId": {"$in": oos_ids}, "IsActive": True})
+        }
+        rows: list[dict] = []
+        total = 0
+        for pid in oos_ids:
+            p = products.get(pid)
+            if not p:
+                continue
+            total += 1
+            if len(rows) < max(1, limit):
+                row = _product_to_dict(p)
+                row["stock_quantity"] = 0
+                rows.append(row)
+        return rows, total
+
 
 def build_mongo_repo(settings: Settings) -> Optional[MongoCatalogRepository]:
     """Construct the repository, or return ``None`` for graceful degradation
