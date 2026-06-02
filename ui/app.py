@@ -434,7 +434,7 @@ with tab_reco:
 
     o1, o2, o3 = st.columns([1.2, 1.2, 1.6])
     max_results = o1.slider("Max results", 1, 10, 3)
-    use_ai = o2.toggle("AI explanations", value=True, help="Off = instant rule-based explanations.")
+    use_ai = o2.toggle("Explanations", value=True, help="Off = instant rule-based explanations.")
     o3.write("")
     go = o3.button("Find replacements", type="primary", use_container_width=True)
 
