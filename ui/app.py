@@ -512,6 +512,24 @@ def build_css(dark: bool) -> str:
 def chip(text: str, tone: str = "") -> str:
     return f'<span class="chip {tone}">{esc(text)}</span>'
 
+def dim_pct(b: dict, key: str, mx: int) -> int:
+    """A dimension's score as a percentage of its own max (0–100)."""
+    got = b.get(key, 0) or 0
+    return round(got / mx * 100) if mx else 0
+
+def fit_pct(b: dict) -> int:
+    """Total fit = the unweighted average of each dimension's percentage."""
+    pcts = [dim_pct(b, key, mx) for key, _lbl, mx in DIMENSIONS]
+    return round(sum(pcts) / len(pcts)) if pcts else 0
+
+def quality_label(pct: int) -> str:
+    """Human verdict from a 0–100 score (mirrors the engine's thresholds)."""
+    if pct >= 85: return "Excellent"
+    if pct >= 70: return "Strong"
+    if pct >= 55: return "Good"
+    if pct >= 40: return "Fair"
+    return "Weak"
+
 def score_ring(pct: int, size: int = 54) -> str:
     pct = max(0, min(100, int(pct or 0)))
     r = size / 2 - 4
@@ -534,11 +552,12 @@ def score_ring(pct: int, size: int = 54) -> str:
 def score_bar(label: str, got: int, mx: int) -> str:
     got = got or 0
     ratio = got / mx if mx else 0
+    pct = round(ratio * 100)
     tone = "var(--success)" if ratio >= 0.999 else "var(--brand)" if ratio >= 0.6 else "var(--warn)"
     return (
         f'<div class="brk-row"><span class="brk-l">{label}</span>'
-        f'<span class="brk-track"><span class="brk-fill" style="width:{round(ratio*100)}%;background:{tone}"></span></span>'
-        f'<span class="brk-v">{got}/{mx}</span></div>'
+        f'<span class="brk-track"><span class="brk-fill" style="width:{pct}%;background:{tone}"></span></span>'
+        f'<span class="brk-v">{pct}%</span></div>'
     )
 
 def reason_chips(b: dict) -> str:
@@ -582,11 +601,10 @@ def render_oos_card(p: dict) -> str:
 
 def render_replacement(rep: dict, rank: int) -> str:
     top    = rank == 1
-    label  = rep.get("confidenceLabel", "")
-    qcolor = LABEL_COLORS.get(label, "var(--muted)")
-    pct    = int(rep.get("confidencePct", 0) or 0)
-    score  = rep.get("finalScore", 0)
     b      = rep.get("scoreBreakdown", {}) or {}
+    total  = fit_pct(b)
+    label  = quality_label(total)
+    qcolor = LABEL_COLORS.get(label, "var(--muted)")
     bars   = "".join(score_bar(lbl, b.get(key, 0), mx) for key, lbl, mx in DIMENSIONS)
     expl   = esc(rep.get("explanation", "")) or "No explanation available."
     badge  = (f'<div class="rec-badge">{ico(ICON_CHECK, 12, "#fff")}Recommended</div>') if top else ""
@@ -601,16 +619,16 @@ def render_replacement(rep: dict, rank: int) -> str:
         f'<div class="rec-sub">{ico(ICON_SHIP, 15, "var(--faint)")}<span>{esc(rep.get("productId",""))}</span></div></div>'
         '<div class="rec-score"><div>'
         f'<div class="rec-qlabel" style="color:{qcolor}">{esc(label)} match</div>'
-        f'<div class="rec-fit">Fit score {score}/{FIT_MAX}</div></div>'
-        f'{score_ring(pct)}</div>'
+        f'<div class="rec-fit">Fit score {total}%</div></div>'
+        f'{score_ring(total)}</div>'
         '</div>'
         f'<div class="chips">{reason_chips(b)}</div>'
         '<details class="why"><summary>'
         f'{ico(ICON_INFO, 16)}<span>Why this match</span><span class="chev ico">{ICON_CHEV}</span></summary>'
         '<div class="why-body">'
         f'<div class="brk">{bars}'
-        f'<div class="brk-total"><span class="l">Total fit score</span>'
-        f'<span class="v" style="color:{qcolor}">{score} / {FIT_MAX}</span></div></div>'
+        f'<div class="brk-total"><span class="l">Total fit score · average</span>'
+        f'<span class="v" style="color:{qcolor}">{total}%</span></div></div>'
         f'<div class="rationale">{ico(ICON_SWAP, 18, "var(--accent-text)", mt=1)}<p>{expl}</p></div>'
         '</div></details>'
         '</div></div></div>'
@@ -641,9 +659,9 @@ def render_compare(oos: dict, reps: list[dict]) -> str:
     for i, m in enumerate(reps):
         cls = "cmp-best" if i == 0 else ""
         head += (f'<th class="{cls}"><div style="display:flex;align-items:center;gap:8px">'
-                 f'{score_ring(int(m.get("confidencePct",0) or 0), 38)}'
+                 f'{score_ring(fit_pct(m.get("scoreBreakdown", {}) or {}), 38)}'
                  f'<div class="cmp-name">{esc(m.get("name",""))}</div></div>'
-                 f'<div class="cmp-sub">{chip("Best match","good") if i==0 else chip(m.get("confidenceLabel",""),"good")}</div></th>')
+                 f'<div class="cmp-sub">{chip("Best match","good") if i==0 else chip(quality_label(fit_pct(m.get("scoreBreakdown", {}) or {})),"good")}</div></th>')
 
     def row(label, oos_val, render):
         cells = f'<th scope="row" class="rowlabel">{label}</th>'
@@ -653,15 +671,14 @@ def render_compare(oos: dict, reps: list[dict]) -> str:
             cells += f'<td class="{cls}">{render(m)}</td>'
         return f'<tr>{cells}</tr>'
 
-    body = row("Fit score", "-",
-               lambda m: f'<b>{m.get("finalScore",0)}/{FIT_MAX}</b> · {int(m.get("confidencePct",0) or 0)}%')
+    body = row("Fit score · avg", "-",
+               lambda m: f'<b>{fit_pct(m.get("scoreBreakdown", {}) or {})}%</b>')
     for key, lbl, mx in DIMENSIONS:
         def render_dim(m, key=key, mx=mx):
-            got = (m.get("scoreBreakdown", {}) or {}).get(key, 0)
-            ratio = got / mx if mx else 0
-            tone = "var(--success)" if ratio >= 0.999 else "var(--brand)" if ratio >= 0.6 else "var(--warn)"
-            return (f'<b>{got}/{mx}</b>'
-                    f'<div class="cmp-bar"><span style="width:{round(ratio*100)}%;background:{tone}"></span></div>')
+            pct = dim_pct(m.get("scoreBreakdown", {}) or {}, key, mx)
+            tone = "var(--success)" if pct >= 100 else "var(--brand)" if pct >= 60 else "var(--warn)"
+            return (f'<b>{pct}%</b>'
+                    f'<div class="cmp-bar"><span style="width:{pct}%;background:{tone}"></span></div>')
         body += row(lbl, "-", render_dim)
     body += row("Why this match", f'Contract {esc((oos or {}).get("contractNumber",""))} · {esc(price)} {esc(unit)}',
                 lambda m: f'<div class="cmp-expl">{esc(m.get("explanation",""))}</div>')
@@ -672,14 +689,14 @@ def render_compare(oos: dict, reps: list[dict]) -> str:
 def render_swap(oos: dict, m: dict, accepted: bool) -> str:
     """Focused before → after panel for one chosen candidate."""
     price, unit = catalog_price(oos or {})
-    label = m.get("confidenceLabel", "")
-    pct   = int(m.get("confidencePct", 0) or 0)
     b     = m.get("scoreBreakdown", {}) or {}
+    total = fit_pct(b)
+    label = quality_label(total)
     diffs = "".join(
         f'<div class="swap-diff-row"><span class="l">{lbl}</span>'
         f'<span class="from">-</span>{ico(ICON_CHEVR, 16, "var(--border-strong)")}'
-        f'<span class="to">{b.get(key,0)}/{mx}'
-        f'{ico(ICON_CHECK, 15, "var(--success)") if (b.get(key,0)/mx if mx else 0) >= 0.999 else ""}</span></div>'
+        f'<span class="to">{dim_pct(b, key, mx)}%'
+        f'{ico(ICON_CHECK, 15, "var(--success)") if dim_pct(b, key, mx) >= 100 else ""}</span></div>'
         for key, lbl, mx in DIMENSIONS
     )
     return (
@@ -693,11 +710,11 @@ def render_swap(oos: dict, m: dict, accepted: bool) -> str:
         '</div>'
         f'<div class="swap-arrow"><span>{ico(ICON_SWAP, 20, "#fff")}</span></div>'
         '<div class="swap-pane in">'
-        f'<div style="display:flex;align-items:center;gap:8px">{chip((label + " match · best pick") if label else "Best pick","good")}{score_ring(pct, 40)}</div>'
+        f'<div style="display:flex;align-items:center;gap:8px">{chip((label + " match · best pick") if label else "Best pick","good")}{score_ring(total, 40)}</div>'
         f'<div class="swap-pane-head"><div class="swap-thumb">{ICON_BOX}</div>'
         f'<div><div class="swap-name">{esc(m.get("name",""))}</div>'
         f'<div class="swap-meta">{ico(ICON_SHIP,13,"var(--faint)")} {esc(m.get("productId",""))}</div></div></div>'
-        f'<div class="swap-price">Fit score {m.get("finalScore",0)}/{FIT_MAX}<small>{pct}% confidence</small></div>'
+        f'<div class="swap-price">Fit score {total}%<small>average of factors</small></div>'
         '</div></div>'
         f'<div class="swap-chips">{reason_chips(b)}</div>'
         f'<div class="swap-diff">{diffs}</div>'
@@ -733,7 +750,18 @@ tb1.markdown(
     f'<div class="tb-search">{ico(ICON_SEARCH, 17, "var(--faint)")}Search products, orders, suppliers…</div>',
     unsafe_allow_html=True,
 )
-tb2.toggle("🌙 Dark mode", key="dark_mode", help="Switch between light and dark themes.")
+# Theme switch as a button (a button's whole area is a reliable click target — the
+# BaseWeb toggle's label-click was unreliable in the topbar column). The on_click
+# callback flips `dark_mode` BEFORE Streamlit reruns, so build_css (top) re-applies
+# the new theme on the same interaction — no manual st.rerun needed.
+def _toggle_theme():
+    st.session_state.dark_mode = not st.session_state.get("dark_mode", False)
+
+_dark = st.session_state.get("dark_mode", False)
+tb2.button("Light mode" if _dark else "Dark mode",
+           icon=":material/light_mode:" if _dark else ":material/dark_mode:",
+           use_container_width=True, key="theme_toggle", on_click=_toggle_theme,
+           help="Switch between light and dark themes.")
 tb3.markdown(
     '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px">'
     f'<div class="tb-pill">{ico(ICON_SHIP, 17, "var(--muted)")}<span>TS cisbox</span>{ico(ICON_CHEV, 15, "var(--faint)")}</div>'
