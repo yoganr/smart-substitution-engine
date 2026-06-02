@@ -274,11 +274,11 @@ html,body,.stApp{background:var(--bg);color:var(--text)}
 .stApp [data-testid="stCaptionContainer"]{color:var(--muted)!important}
 
 /* inputs / selects / steppers */
-.stApp [data-baseweb="input"],.stApp [data-baseweb="textarea"],
-.stApp [data-baseweb="select"]>div,.stApp [data-baseweb="base-input"]{
-  background:var(--surface)!important;border-color:var(--border-strong)!important;border-radius:8px!important}
+.stApp [data-baseweb="input"],.stApp [data-baseweb="textarea"],.stApp [data-baseweb="select"]>div{
+  background:var(--surface)!important;border:1px solid var(--border-strong)!important;border-radius:8px!important}
+.stApp [data-baseweb="base-input"]{background:var(--surface)!important;border:none!important}
 .stApp input,.stApp textarea,.stApp [data-baseweb="select"] div{color:var(--text)!important}
-.stApp [data-testid="stNumberInput"] button{background:var(--surface)!important;border-color:var(--border-strong)!important;color:var(--text)!important}
+.stApp [data-testid="stNumberInput"] button{background:var(--surface)!important;border:1px solid var(--border-strong)!important;color:var(--text)!important}
 
 /* primary action button - cisbox green */
 .stApp button[kind="primary"],.stApp [data-testid="stBaseButton-primary"],
@@ -302,7 +302,10 @@ html,body,.stApp{background:var(--bg);color:var(--text)}
 .stApp [data-testid="stExpander"] summary{color:var(--text)}
 .stApp [data-testid="stStatus"]{background:var(--surface);border:1px solid var(--border);border-radius:8px}
 .stApp [data-testid="stStatus"] *{color:var(--text)}
-.stApp [data-baseweb="segmented-control"]{background:var(--track)}
+.stApp [data-testid="stButtonGroup"] [data-testid="stBaseButton-segmented_control"]{
+  background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border-strong)!important}
+.stApp [data-testid="stButtonGroup"] [data-testid="stBaseButton-segmented_controlActive"]{
+  background:var(--brand-10)!important;color:var(--accent-text)!important;border:1px solid var(--brand)!important}
 
 /* ── topbar (account strip) ── */
 .topbar{display:flex;align-items:center;gap:14px;margin:2px 0 10px}
@@ -767,12 +770,7 @@ with st.sidebar:
         ) + '</div>',
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="sb-divider"></div><div class="sb-grouplabel">Settings</div>', unsafe_allow_html=True)
-
-    with st.expander("Advanced"):
-        st.session_state.backend_url = st.text_input("Backend URL",  value=_backend())
-        st.session_state.ai_url      = st.text_input("AI service URL", value=_ai())
-
+    st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
     st.markdown(
         '<div style="color:var(--faint);font-size:.78rem;margin-top:18px;">Smart Substitution Engine</div>',
         unsafe_allow_html=True,
