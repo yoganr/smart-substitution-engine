@@ -743,7 +743,7 @@ st.markdown('<div class="crumb">Ordering<span class="sep">/</span><b>Smart subst
 st.markdown(
     f'<div class="phead"><div class="logo">{ico(ICON_SWAP, 26, "#fff")}</div>'
     '<div><h1>Smart Substitution Engine</h1>'
-    '<div class="tag">AI-ranked replacements that protect your price, recipe and compliance '
+    '<div class="tag">AI - ranked replacements that protect your price, recipe and compliance '
     'when a product goes out of stock.</div></div></div>',
     unsafe_allow_html=True,
 )
@@ -774,7 +774,7 @@ with st.sidebar:
         st.session_state.ai_url      = st.text_input("AI service URL", value=_ai())
 
     st.markdown(
-        '<div style="color:var(--faint);font-size:.78rem;margin-top:18px;">Smart Substitution Engine · demo</div>',
+        '<div style="color:var(--faint);font-size:.78rem;margin-top:18px;">Smart Substitution Engine</div>',
         unsafe_allow_html=True,
     )
 
@@ -853,7 +853,7 @@ with tab_reco:
     o1, o2, o3 = st.columns([1.5, 1.5, 2])
     quantity    = o1.number_input("Quantity needed", value=10, min_value=1, step=1)
     max_results = o2.slider("Max results", 1, 10, 3)
-    use_ai      = o3.toggle("xplanations", value=True,
+    use_ai      = o3.toggle("Explanations", value=True,
                             help="Off = instant rule-based explanations.")
 
     go = st.button(
