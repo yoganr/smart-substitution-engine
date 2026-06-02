@@ -73,7 +73,7 @@ public class RecommendationController : ControllerBase
 
         // 4. Build Python AI request.
         //    Every candidate is a contracted product, so we pass it as both a
-        //    candidateProduct and a contractItem — this ensures the Python scorer
+        //    candidateProduct and a contractItem - this ensures the Python scorer
         //    awards the full contract-match bonus to every result.
         var contractItems = candidates
             .Select(c => new PythonContractItemDto(

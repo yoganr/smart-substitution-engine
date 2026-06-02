@@ -3,7 +3,7 @@ namespace SmartSubstitution.Api.Dtos;
 // ── Client-facing request/response ──────────────────────────────────────────
 
 /// <summary>
-/// Product identifier — matches the composite _id in the catalog:
+/// Product identifier - matches the composite _id in the catalog:
 /// { ItemNumber, SellerAccountNumber, ContractNumber }.
 /// </summary>
 public record ProductIdentifierDto(

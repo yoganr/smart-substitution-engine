@@ -11,7 +11,7 @@ public class CatalogController : ControllerBase
 
     public CatalogController(LocalCatalogService catalog) => _catalog = catalog;
 
-    /// <summary>GET /catalog/diagnostic — connection check + document count</summary>
+    /// <summary>GET /catalog/diagnostic - connection check + document count</summary>
     [HttpGet("diagnostic")]
     public async Task<IActionResult> Diagnostic(CancellationToken ct) =>
         Ok(await _catalog.DiagnosticAsync(ct));

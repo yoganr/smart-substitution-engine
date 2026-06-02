@@ -1,4 +1,4 @@
-"""Smart Substitution Engine — demo UI (Streamlit), cisbox design.
+"""Smart Substitution Engine - demo UI (Streamlit), cisbox design.
 
 Tab 1 – Replacements: searches the real MongoDB catalog via the .NET backend,
          lets the user pick an out-of-stock product by contract number, then
@@ -99,7 +99,7 @@ def catalog_search(query: str, contracts: list[str], limit: int = 12):
 # The .NET catalog Mongo is not provisioned in this environment (LocalMongoDB has
 # no connection string → /catalog/search returns 500). So when the real catalog
 # search yields nothing, the Replacements flow falls back to this built-in sample
-# catalog and asks the LIVE Python AI engine (:8000) to rank the alternatives —
+# catalog and asks the LIVE Python AI engine (:8000) to rank the alternatives -
 # a fully working demo with no backend/infra changes.
 
 SAMPLE_CONTRACT = "3177"
@@ -116,18 +116,18 @@ def _p(item, name, brand, cat, label, price, pack, stock, cprice=None, pref=Fals
     }
 
 SAMPLE_CATALOG = [
-    # — Kylling (chicken) —
+    # - Kylling (chicken) -
     _p("K-100", "Kyllingfilet 2,5 kg",            "Prior Norge",      "kylling", "Kylling", 98.5, 2.5,   0),
     _p("K-101", "Kyllingfilet Premium 2,5 kg",    "Prior Norge",      "kylling", "Kylling", 95.0, 2.5, 150, cprice=92.0, pref=True),
     _p("K-102", "Økologisk kyllingfilet 2 kg",    "Norsk Kylling",    "kylling", "Kylling", 112.0, 2.0,  40),
     _p("K-103", "Kyllingbryst 5 kg",              "Prior Norge",      "kylling", "Kylling", 178.0, 5.0,  60, cprice=170.0),
     _p("K-104", "Kyllinglårfilet 2 kg",           "Den Stolte Hane",  "kylling", "Kylling", 86.0, 2.0,   90),
-    # — Laks (salmon) —
+    # - Laks (salmon) -
     _p("L-200", "Laksefilet 1 kg",                "Salmar",           "laks", "Laks", 169.0, 1.0,   0),
     _p("L-201", "Laksefilet porsjon 1 kg",        "Lerøy",            "laks", "Laks", 175.0, 1.0,  80, cprice=162.0, pref=True),
     _p("L-202", "Økologisk laksefilet 1 kg",      "Lerøy",            "laks", "Laks", 199.0, 1.0,  25),
     _p("L-203", "Ørretfilet 1 kg",                "Salmar",           "laks", "Laks", 159.0, 1.0,  55),
-    # — Frukt (orange / citrus) —
+    # - Frukt (orange / citrus) -
     _p("F-300", "Appelsin 10 kg",                 "Bama",             "frukt", "Frukt", 240.0, 10.0,  0),
     _p("F-301", "Appelsin Navel 10 kg",           "Bama",             "frukt", "Frukt", 250.0, 10.0, 120, cprice=232.0, pref=True),
     _p("F-302", "Økologisk appelsin 8 kg",        "Bama",             "frukt", "Frukt", 262.0, 8.0,  30),
@@ -196,7 +196,7 @@ def catalog_price(p: dict):
     cu = next((pt for pt in p.get("partTypes", []) if pt.get("code") == "CU"), None)
     tu = next((pt for pt in p.get("partTypes", []) if pt.get("code") == "TU"), None)
     pt = cu or tu
-    price = pt["price"].get("unitPrice", "—") if pt and pt.get("price") else "—"
+    price = pt["price"].get("unitPrice", "-") if pt and pt.get("price") else "-"
     unit  = pt.get("unit", "") if pt else ""
     return price, unit
 
@@ -280,14 +280,14 @@ html,body,.stApp{background:var(--bg);color:var(--text)}
 .stApp input,.stApp textarea,.stApp [data-baseweb="select"] div{color:var(--text)!important}
 .stApp [data-testid="stNumberInput"] button{background:var(--surface)!important;border-color:var(--border-strong)!important;color:var(--text)!important}
 
-/* primary action button — cisbox green */
+/* primary action button - cisbox green */
 .stApp button[kind="primary"],.stApp [data-testid="stBaseButton-primary"],
 .stApp [data-testid="baseButton-primary"]{
   background:var(--brand)!important;border:none!important;color:#fff!important;
   border-radius:8px!important;font-weight:700!important}
 .stApp button[kind="primary"]:hover,.stApp [data-testid="stBaseButton-primary"]:hover{background:var(--brand-hover)!important}
 
-/* secondary buttons — surface with brand outline */
+/* secondary buttons - surface with brand outline */
 .stApp button[kind="secondary"],.stApp [data-testid="baseButton-secondary"],
 .stApp [data-testid="stBaseButton-secondary"]{
   background:var(--surface)!important;color:var(--accent-text)!important;
@@ -559,7 +559,7 @@ def reason_chips(b: dict) -> str:
 
 def render_oos_card(p: dict) -> str:
     price, unit = catalog_price(p)
-    cats = "".join(chip(c, "") for c in (p.get("catalogCategories") or [])[:3]) or "—"
+    cats = "".join(chip(c, "") for c in (p.get("catalogCategories") or [])[:3]) or "-"
     return (
         '<div class="oos">'
         f'<div class="oos-banner">{ico(ICON_WARN, 18, "var(--danger-text)")}'
@@ -650,7 +650,7 @@ def render_compare(oos: dict, reps: list[dict]) -> str:
             cells += f'<td class="{cls}">{render(m)}</td>'
         return f'<tr>{cells}</tr>'
 
-    body = row("Fit score", "—",
+    body = row("Fit score", "-",
                lambda m: f'<b>{m.get("finalScore",0)}/{FIT_MAX}</b> · {int(m.get("confidencePct",0) or 0)}%')
     for key, lbl, mx in DIMENSIONS:
         def render_dim(m, key=key, mx=mx):
@@ -659,7 +659,7 @@ def render_compare(oos: dict, reps: list[dict]) -> str:
             tone = "var(--success)" if ratio >= 0.999 else "var(--brand)" if ratio >= 0.6 else "var(--warn)"
             return (f'<b>{got}/{mx}</b>'
                     f'<div class="cmp-bar"><span style="width:{round(ratio*100)}%;background:{tone}"></span></div>')
-        body += row(lbl, "—", render_dim)
+        body += row(lbl, "-", render_dim)
     body += row("Why this match", f'Contract {esc((oos or {}).get("contractNumber",""))} · {esc(price)} {esc(unit)}',
                 lambda m: f'<div class="cmp-expl">{esc(m.get("explanation",""))}</div>')
 
@@ -674,7 +674,7 @@ def render_swap(oos: dict, m: dict, accepted: bool) -> str:
     b     = m.get("scoreBreakdown", {}) or {}
     diffs = "".join(
         f'<div class="swap-diff-row"><span class="l">{lbl}</span>'
-        f'<span class="from">—</span>{ico(ICON_CHEVR, 16, "var(--border-strong)")}'
+        f'<span class="from">-</span>{ico(ICON_CHEVR, 16, "var(--border-strong)")}'
         f'<span class="to">{b.get(key,0)}/{mx}'
         f'{ico(ICON_CHECK, 15, "var(--success)") if (b.get(key,0)/mx if mx else 0) >= 0.999 else ""}</span></div>'
         for key, lbl, mx in DIMENSIONS
@@ -684,7 +684,7 @@ def render_swap(oos: dict, m: dict, accepted: bool) -> str:
         '<div class="swap-pane out">'
         f'<div>{chip("Out of stock","danger")}</div>'
         f'<div class="swap-pane-head"><div class="swap-thumb">{ICON_BOX}</div>'
-        f'<div><div class="swap-name">{esc((oos or {}).get("name","—"))}</div>'
+        f'<div><div class="swap-name">{esc((oos or {}).get("name","-"))}</div>'
         f'<div class="swap-meta">{esc((oos or {}).get("sellerName",""))} · contract {esc((oos or {}).get("contractNumber",""))}</div></div></div>'
         f'<div class="swap-price">{esc(price)} {esc(unit)}<small>reference</small></div>'
         '</div>'
@@ -720,7 +720,7 @@ def empty_state(icon_svg: str, title: str, body: str) -> str:
 
 # ── Page setup ────────────────────────────────────────────────────────────────
 
-st.set_page_config(page_title="Smart Substitution Engine — cisbox", page_icon="🔁", layout="wide")
+st.set_page_config(page_title="Smart Substitution Engine - cisbox", page_icon="🔁", layout="wide")
 # Theme is driven by the sidebar toggle (read here so the whole app re-themes on flip).
 st.markdown(build_css(st.session_state.get("dark_mode", False)), unsafe_allow_html=True)
 
@@ -783,7 +783,7 @@ with st.sidebar:
 tab_reco, tab_search = st.tabs(["Replacements", "Similar products"])
 
 # =========================================================================== #
-# Tab 1 — Replacements
+# Tab 1 - Replacements
 # =========================================================================== #
 with tab_reco:
 
@@ -793,7 +793,7 @@ with tab_reco:
         st.toast(_pt, icon=":material/check_circle:")
 
     # ── Step 1: Contract numbers ──────────────────────────────────────────────
-    st.markdown('<div class="sec">Step 1 — Your contract numbers</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec">Step 1 - Your contract numbers</div>', unsafe_allow_html=True)
     contracts_input = st.text_input(
         "Contract numbers (comma-separated)",
         value=st.session_state.get("contracts_input", "3177"),
@@ -805,7 +805,7 @@ with tab_reco:
     contract_numbers = [c.strip() for c in contracts_input.split(",") if c.strip()]
 
     # ── Step 2: Find the out-of-stock product ────────────────────────────────
-    st.markdown('<div class="sec">Step 2 — Search for the out-of-stock product</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec">Step 2 - Search for the out-of-stock product</div>', unsafe_allow_html=True)
 
     s1, s2 = st.columns([4, 1])
     search_query = s1.text_input("Product name", value=st.session_state.get("search_query", ""),
@@ -820,7 +820,7 @@ with tab_reco:
             st.session_state.selected_product = None
             st.session_state.search_is_demo = False
         else:
-            # Real catalog has no products in this environment — fall back to the
+            # Real catalog has no products in this environment - fall back to the
             # built-in sample catalog so the demo works against the live AI engine.
             demo = demo_search(search_query)
             st.session_state.catalog_results = demo
@@ -832,13 +832,13 @@ with tab_reco:
     results = st.session_state.get("catalog_results", [])
     if results:
         if st.session_state.get("search_is_demo"):
-            st.caption("Showing sample demo data — the live catalog backend has no products in this environment.")
+            st.caption("Showing sample demo data - the live catalog backend has no products in this environment.")
         options = {
             f"[{p.get('contractNumber')}]  {p.get('name','')}  ({p.get('itemNumber','')})": p
             for p in results
         }
         chosen_label = st.selectbox(
-            f"{len(results)} product(s) found — select the out-of-stock one:",
+            f"{len(results)} product(s) found - select the out-of-stock one:",
             list(options.keys()),
             key="product_select",
         )
@@ -849,7 +849,7 @@ with tab_reco:
     selected = st.session_state.get("selected_product")
 
     # ── Step 3: Request details / run controls ────────────────────────────────
-    st.markdown('<div class="sec">Step 3 — Request details</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec">Step 3 - Request details</div>', unsafe_allow_html=True)
     o1, o2, o3 = st.columns([1.5, 1.5, 2])
     quantity    = o1.number_input("Quantity needed", value=10, min_value=1, step=1)
     max_results = o2.slider("Max results", 1, 10, 3)
@@ -908,7 +908,7 @@ with tab_reco:
     else:
         data = reco["data"]
         if not data.get("replacementNeeded"):
-            st.success("Product is in stock — no replacement needed.")
+            st.success("Product is in stock - no replacement needed.")
         else:
             reps = data.get("replacements") or []
             excluded = data.get("rejectedCandidates") or []
@@ -950,7 +950,7 @@ with tab_reco:
                     st.markdown(render_swap(selected, m, accepted), unsafe_allow_html=True)
                     if accepted:
                         st.button("✓ Swap added to order", disabled=True, use_container_width=True, key="swap_done")
-                    elif st.button("Accept swap — add to order", type="primary",
+                    elif st.button("Accept swap - add to order", type="primary",
                                    use_container_width=True, key="swap_accept"):
                         st.session_state.accepted_id = m.get("productId")
                         # Queue the toast so it survives the rerun (st.toast before
@@ -959,7 +959,7 @@ with tab_reco:
                         st.rerun()
 
 # =========================================================================== #
-# Tab 2 — Similar products (Python AI service — unchanged flow)
+# Tab 2 - Similar products (Python AI service - unchanged flow)
 # =========================================================================== #
 SAMPLE_CATALOG = [
     {"id": "product_001",  "name": "Chicken Breast 2kg",              "category_id": "chicken",      "is_active": True,  "dietary_tags": ["halal"]},
@@ -978,7 +978,7 @@ SAMPLE_CATALOG = [
 
 with tab_search:
     st.markdown('<div class="sec">Find similar products</div>', unsafe_allow_html=True)
-    st.caption("Semantic vector search — finds products by meaning, not just keywords.")
+    st.caption("Semantic vector search - finds products by meaning, not just keywords.")
 
     if st.button("Load sample catalog", use_container_width=True):
         with st.spinner("Loading catalog into search index…"):
@@ -987,7 +987,7 @@ with tab_search:
             st.session_state.pop("_health_ai", None)
             st.success(f"Loaded {data['indexed']} products into the search index.")
         else:
-            st.error("Couldn't load the catalog — AI search service unavailable.")
+            st.error("Couldn't load the catalog - AI search service unavailable.")
 
     q1, q2, q3 = st.columns([3, 2, 1])
     query     = q1.text_input("Search for", "Chicken Breast 2kg")
@@ -1009,7 +1009,7 @@ with tab_search:
                                 "Load the sample catalog, then search for a product to see the closest matches."),
                     unsafe_allow_html=True)
     elif not sim["ok"]:
-        st.error("Search unavailable — load the sample catalog first.")
+        st.error("Search unavailable - load the sample catalog first.")
     else:
         hits = sim["data"].get("results", [])
         if not hits:
@@ -1028,7 +1028,7 @@ with tab_search:
 # NB: st.components.v1.html is required here (not st.iframe / st.html): we need an
 # iframe whose inline script reaches window.parent.document to mount a *floating*
 # launcher. st.iframe only takes a URL (would box the chat inline) and st.html
-# doesn't execute <script>. Streamlit marks v1.html deprecated — keep an eye on it
+# doesn't execute <script>. Streamlit marks v1.html deprecated - keep an eye on it
 # on major Streamlit upgrades.
 # =========================================================================== #
 st.components.v1.html(
@@ -1048,7 +1048,7 @@ st.components.v1.html(
       if (doc.getElementById('sse-chat-widget')) return;          // already mounted
       if (!doc.getElementById('sse-chat-loader')) inject();        // first load (let it finish)
       // ONE delayed retry only if the widget never appeared (e.g. AI service was
-      // still warming up). No tight loop — so a slow load is never interrupted.
+      // still warming up). No tight loop - so a slow load is never interrupted.
       setTimeout(function () {{
         if (doc.getElementById('sse-chat-widget')) return;
         var old = doc.getElementById('sse-chat-loader'); if (old) old.remove();

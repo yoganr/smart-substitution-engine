@@ -93,7 +93,7 @@ public class StockAreaFilter
     public string PartType { get; set; } = null!;
 }
 
-// ── ExtraItemInfo — { k: "GPC", v: ["10005889"] } ────────────────────────────
+// ── ExtraItemInfo - { k: "GPC", v: ["10005889"] } ────────────────────────────
 
 public class ExtraItemInfoEntry
 {
@@ -206,7 +206,7 @@ public class CatalogProduct
     public bool IsActive => Expired == 0 && DateExpired == null;
 
     /// <summary>
-    /// Consumer unit — individual piece. Code=="CU" when present;
+    /// Consumer unit - individual piece. Code=="CU" when present;
     /// fallback: the PartType with the smallest NumberInUnit (CU always has NumberInUnit=1).
     /// </summary>
     [BsonIgnore]
@@ -215,7 +215,7 @@ public class CatalogProduct
         ?? PartTypes.OrderBy(p => ParseNiu(p.NumberInUnit)).FirstOrDefault();
 
     /// <summary>
-    /// Trade/pack unit — whole package (NumberInUnit > 1, e.g. 6, 10, 15).
+    /// Trade/pack unit - whole package (NumberInUnit > 1, e.g. 6, 10, 15).
     /// Code=="TU" when present; fallback: PartType with the largest NumberInUnit.
     /// </summary>
     [BsonIgnore]
@@ -243,7 +243,7 @@ public class CatalogProduct
     /// CU is available. When StockAreas are present, checks for a CU StockArea with
     /// Available=true. When absent (most suppliers don't publish stock areas), falls back
     /// to checking whether the product actually has a PartType that can be ordered as a
-    /// single unit (NumberInUnit ≤ 1) — e.g. a product sold only in packs of 6 or 10
+    /// single unit (NumberInUnit ≤ 1) - e.g. a product sold only in packs of 6 or 10
     /// has no CU format and returns false.
     /// </summary>
     [BsonIgnore]

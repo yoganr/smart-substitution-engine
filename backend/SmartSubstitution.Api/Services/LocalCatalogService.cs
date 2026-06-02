@@ -11,7 +11,7 @@ namespace SmartSubstitution.Api.Services;
 /// Reads CatalogProduct documents from the local network MongoDB and maps
 /// them to the DTOs the Python AI service expects.
 ///
-/// Every query is scoped to a list of ContractNumbers — the catalogs the
+/// Every query is scoped to a list of ContractNumbers - the catalogs the
 /// requesting user has access to.
 /// </summary>
 public class LocalCatalogService
@@ -170,7 +170,7 @@ public class LocalCatalogService
     {
         var (unit, unitPrice, packSize) = ResolveUnitPrice(p, preferredPartType);
 
-        // StockAreas carries Available per PartType — no quantity exists.
+        // StockAreas carries Available per PartType - no quantity exists.
         // Send a large proxy so the Python scorer awards full stock_availability points
         // when the candidate is available in the preferred PartType.
         var inStock = preferredPartType switch
@@ -231,7 +231,7 @@ public class LocalCatalogService
                     (double)cu.Price.UnitPriceDecimal,
                     ParseDouble(cu.NumberInUnit));
 
-        // No preference — default to CU then TU
+        // No preference - default to CU then TU
         if (cu is not null)
             return (cu.Unit ?? p.MeasurementInfo?.MeasurementCode ?? "KG",
                     (double)cu.Price.UnitPriceDecimal,
@@ -253,7 +253,7 @@ public class LocalCatalogService
         var path = p.CategoryPaths.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c));
         if (!string.IsNullOrWhiteSpace(path)) return ExtractTopCategory(path);
 
-        // Priority 2: product name — NEVER integer catalog category IDs like "9264".
+        // Priority 2: product name - NEVER integer catalog category IDs like "9264".
         // The Python AI scoring uses bge-m3 embeddings on this field; an opaque integer
         // carries zero semantic signal, so the model treats every product in the same
         // broad catalog bucket as equally similar. Using the product name lets the

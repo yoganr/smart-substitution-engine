@@ -17,7 +17,7 @@ builder.Services.Configure<PythonAiSettings>(
 builder.Services.Configure<LocalMongoDbSettings>(
     builder.Configuration.GetSection("LocalMongoDB"));
 
-// ── MongoDB — Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
+// ── MongoDB - Singleton (CRITICAL: Scoped/Transient exhausts Atlas M0 pool) ──
 
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
